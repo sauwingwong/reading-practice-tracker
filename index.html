@@ -703,7 +703,10 @@
           <button id="pa-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pa')">● Record</button>
           <span id="pa-record-status" class="record-status"></span>
         </div>
-        <audio id="pa-playback" controls style="display:none; width:100%"></audio>
+        <div id="pa-playback-row" style="display:none; align-items:center; gap:10px">
+          <audio id="pa-playback" controls style="flex:1"></audio>
+          <a id="pa-download" download="practice.webm" class="practice-btn" style="text-decoration:none">⬇ Download</a>
+        </div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
           <button class="practice-btn" onclick="copyPrompt('annotate')">Copy Gemini Prompt</button>
           <span id="pa-copy-status" class="copy-status"></span>
@@ -746,7 +749,10 @@
           <button id="pg-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pg')">● Record</button>
           <span id="pg-record-status" class="record-status"></span>
         </div>
-        <audio id="pg-playback" controls style="display:none; width:100%"></audio>
+        <div id="pg-playback-row" style="display:none; align-items:center; gap:10px">
+          <audio id="pg-playback" controls style="flex:1"></audio>
+          <a id="pg-download" download="practice.webm" class="practice-btn" style="text-decoration:none">⬇ Download</a>
+        </div>
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
           <button class="practice-btn" onclick="copyPrompt('generate')">Copy Gemini Prompt</button>
           <span id="pg-copy-status" class="copy-status"></span>
@@ -1192,8 +1198,8 @@
     document.getElementById("pa-results").style.display = "flex";
     // Reset recording UI
     const audio = document.getElementById("pa-playback");
-    audio.style.display = "none";
     audio.src = "";
+    document.getElementById("pa-playback-row").style.display = "none";
   }
 
   // ── GENERATE MODE ──────────────────────────────────────────────────────────
@@ -1260,8 +1266,8 @@
     annotateInto(sentence, "pg-annotation");
     document.getElementById("pg-results").style.display = "flex";
     const audio = document.getElementById("pg-playback");
-    audio.style.display = "none";
     audio.src = "";
+    document.getElementById("pg-playback-row").style.display = "none";
   }
 
   // ── RECORDING (shared) ─────────────────────────────────────────────────────
@@ -1297,8 +1303,11 @@
       const blob  = new Blob(practiceChunks, { type: practiceRecorder.mimeType });
       const url   = URL.createObjectURL(blob);
       const audio = document.getElementById(practicePrefix + "-playback");
+      const dl    = document.getElementById(practicePrefix + "-download");
+      const row   = document.getElementById(practicePrefix + "-playback-row");
       audio.src = url;
-      audio.style.display = "block";
+      dl.href   = url;
+      row.style.display = "flex";
     };
     practiceRecorder.start(100);
     practiceRecording = true;
