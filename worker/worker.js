@@ -164,16 +164,21 @@ function textBlocks(content) {
 // ─── Gemini TTS handler ────────────────────────────────────────────────────────
 
 async function handleTts(request, env) {
-  const { sentence } = await request.json();
+  const { sentence, model } = await request.json();
   if (!sentence?.trim()) {
     return Response.json({ error: "No sentence provided" }, { status: 400 });
   }
+
+  // "full" uses 3.1 (richer, 3 RPM free tier); default "quick" uses 2.5 (faster, higher limit)
+  const modelName = model === "full"
+    ? "gemini-3.1-flash-tts-preview"
+    : "gemini-2.5-flash-preview-tts";
 
   // Prefix instructs the model to use British English (RP) pronunciation
   const text = `Speak in British English (Received Pronunciation): ${sentence}`;
 
   const geminiRes = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
+    `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
     {
       method: "POST",
       headers: {

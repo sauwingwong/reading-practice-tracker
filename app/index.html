@@ -687,7 +687,8 @@
         <button id="drill-reveal-btn" class="practice-btn" onclick="revealDrillCard()" disabled title="Record yourself first, then reveal">Reveal ↓</button>
         <button id="drill-got-btn"    class="practice-btn practice-btn-save"   style="display:none" onclick="drillGotIt()">Got it ✓</button>
         <button id="drill-again-btn"  class="practice-btn practice-btn-record" style="display:none" onclick="drillTryAgain()">Try again ↺</button>
-        <button id="drill-listen-btn" class="practice-btn" style="display:none" onclick="drillListen()" title="Hear British English pronunciation">🔊 Listen</button>
+        <button id="drill-listen-quick" class="practice-btn" style="display:none" onclick="drillListen('quick')" title="Gemini 2.5 · best for single sentences · high rate limit">🔊 Quick</button>
+        <button id="drill-listen-full"  class="practice-btn" style="display:none" onclick="drillListen('full')"  title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
       </div>
       <div class="annotation-legend">
         <span class="legend-item"><span class="w-weak" style="pointer-events:none">the</span> weak form</span>
@@ -706,7 +707,8 @@
           <textarea id="pa-sentence" class="short" placeholder="Type or paste any sentence…"></textarea>
         </div>
         <button class="practice-btn" onclick="doAnnotate()">Annotate</button>
-        <button id="pa-listen-btn" class="practice-btn" onclick="listenSentence(document.getElementById('pa-sentence').value.trim(), this)" title="Hear British English pronunciation">🔊 Listen</button>
+        <button class="practice-btn" onclick="listenSentence(document.getElementById('pa-sentence').value.trim(), this, 'quick')" title="Gemini 2.5 · best for single sentences · high rate limit">🔊 Quick</button>
+        <button class="practice-btn" onclick="listenSentence(document.getElementById('pa-sentence').value.trim(), this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
       </div>
 
       <div id="pa-results" class="practice-results" style="display:none">
@@ -758,7 +760,8 @@
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
           <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Generated Passage</label>
           <button class="pmode-restart-btn" onclick="newPassage()">New Passage ↺</button>
-          <button id="pg-listen-btn" class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this)" title="Hear British English pronunciation">🔊 Listen</button>
+          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'quick')" title="Gemini 2.5 · best for single sentences · high rate limit">🔊 Quick</button>
+          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
         </div>
         <div id="pg-annotation" class="annotation-display"></div>
         <div class="annotation-legend">
@@ -16430,7 +16433,8 @@
     revealBtn.title          = "Record yourself first, then reveal";
     document.getElementById("drill-got-btn").style.display    = "none";
     document.getElementById("drill-again-btn").style.display  = "none";
-    document.getElementById("drill-listen-btn").style.display = "none";
+    document.getElementById("drill-listen-quick").style.display = "none";
+    document.getElementById("drill-listen-full").style.display  = "none";
     // Reset recording UI
     document.getElementById("drill-playback-row").style.display = "none";
     const audio = document.getElementById("drill-playback");
@@ -16445,12 +16449,14 @@
     document.getElementById("drill-reveal-btn").style.display = "none";
     document.getElementById("drill-got-btn").style.display    = "";
     document.getElementById("drill-again-btn").style.display  = "";
-    document.getElementById("drill-listen-btn").style.display = "";
+    document.getElementById("drill-listen-quick").style.display = "";
+    document.getElementById("drill-listen-full").style.display  = "";
   }
 
-  function drillListen() {
+  function drillListen(model) {
     const card = drillDeck[drillIndex];
-    listenSentence(card.text, document.getElementById("drill-listen-btn"));
+    const btnId = model === "full" ? "drill-listen-full" : "drill-listen-quick";
+    listenSentence(card.text, document.getElementById(btnId), model);
   }
 
   function drillGotIt() {
@@ -16463,7 +16469,8 @@
       document.getElementById("drill-reveal-btn").style.display = "none";
       document.getElementById("drill-got-btn").style.display    = "none";
       document.getElementById("drill-again-btn").style.display  = "none";
-      document.getElementById("drill-listen-btn").style.display = "none";
+      document.getElementById("drill-listen-quick").style.display = "none";
+      document.getElementById("drill-listen-full").style.display  = "none";
       document.getElementById("drill-counter").textContent = `Done! ${drillDeck.length} / ${drillDeck.length}`;
       document.getElementById("drill-cat").textContent = "";
     }
@@ -16715,7 +16722,8 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   }
 
-  async function listenSentence(sentence, btnEl) {
+  async function listenSentence(sentence, btnEl, model) {
+    if (!sentence) return;
     const orig = btnEl.textContent;
     btnEl.textContent = "Loading…";
     btnEl.disabled = true;
@@ -16723,7 +16731,7 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
       const res = await fetch(`${WORKER_URL}/tts`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sentence }),
+        body: JSON.stringify({ sentence, model }),
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || `TTS error ${res.status}`); }
       const base64 = await res.text();
