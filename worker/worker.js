@@ -173,7 +173,7 @@ async function handleTts(request, env) {
   const text = `Speak in British English (Received Pronunciation): ${sentence}`;
 
   const geminiRes = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent",
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent",
     {
       method: "POST",
       headers: {

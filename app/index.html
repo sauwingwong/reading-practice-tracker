@@ -16725,7 +16725,7 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sentence }),
       });
-      if (!res.ok) throw new Error(`TTS error ${res.status}`);
+      if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || `TTS error ${res.status}`); }
       const base64 = await res.text();
       const url = pcmToWavUrl(base64);
       const audio = new Audio(url);
