@@ -1,0 +1,1449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reading Practice Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg: #191919;
+      --surface: #252525;
+      --surface2: #2f2f2f;
+      --border: #3a3a3a;
+      --text: #e8e8e8;
+      --text-dim: #9a9a9a;
+      --accent: #5b7fff;
+      --accent-hover: #7b97ff;
+      --success: #4caf7d;
+      --danger: #e57373;
+      --tag-chatgpt: #3b8f5a;
+      --tag-gemini: #3a74b5;
+      --tag-claude: #c17a2a;
+      --radius: 8px;
+      --radius-sm: 4px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      background: var(--surface);
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    nav { display: flex; gap: 4px; }
+
+    nav button {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      padding: 6px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    nav button:hover { background: var(--surface2); color: var(--text); }
+    nav button.active { background: var(--accent); color: #fff; }
+
+    /* ── Main layout ── */
+    main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+    /* ── Log view ── */
+    #view-log {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 750px) {
+      #view-log { grid-template-columns: 1fr; }
+    }
+
+    .form-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .preview-panel label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+    }
+
+    .preview-box {
+      flex: 1;
+      min-height: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      overflow-y: auto;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text);
+    }
+
+    .preview-box.empty { color: var(--text-dim); font-style: italic; }
+
+    /* ── Form fields ── */
+    .field { display: flex; flex-direction: column; gap: 5px; }
+
+    .field label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+    }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    input, select, textarea {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      width: 100%;
+      transition: border-color 0.15s;
+      outline: none;
+    }
+
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--accent);
+    }
+
+    select option { background: var(--surface2); }
+
+    textarea { resize: vertical; line-height: 1.5; }
+    textarea.short { min-height: 80px; }
+    textarea.tall { min-height: 200px; }
+
+    /* ── Save button ── */
+    #save-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s;
+      align-self: flex-start;
+    }
+
+    #save-btn:hover { background: var(--accent-hover); }
+    #save-btn:disabled { background: var(--surface2); color: var(--text-dim); cursor: not-allowed; }
+
+    /* ── Status message ── */
+    .status {
+      padding: 8px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      display: none;
+    }
+    .status.success { background: rgba(76, 175, 125, 0.15); color: var(--success); border: 1px solid var(--success); display: block; }
+    .status.error { background: rgba(229, 115, 115, 0.15); color: var(--danger); border: 1px solid var(--danger); display: block; }
+
+    /* ── Review view ── */
+    #view-review { display: flex; flex-direction: column; gap: 16px; }
+
+    .review-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .review-toolbar select { max-width: 160px; }
+
+    #refresh-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+
+    #refresh-btn:hover { color: var(--text); }
+
+    /* ── Session cards ── */
+    .sessions-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .session-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      transition: border-color 0.15s;
+    }
+
+    .session-card:hover { border-color: #555; }
+
+    .session-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .session-title { font-weight: 500; flex: 1; }
+    .session-date { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+
+    .llm-tag {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 100px;
+      white-space: nowrap;
+    }
+
+    .llm-tag.chatgpt { background: rgba(59,143,90,0.2); color: #6ed49a; }
+    .llm-tag.gemini { background: rgba(58,116,181,0.2); color: #7ab4f5; }
+    .llm-tag.claude { background: rgba(193,122,42,0.2); color: #f0b96a; }
+
+    .chevron {
+      color: var(--text-dim);
+      font-size: 12px;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .delete-btn:hover { background: rgba(229,115,115,0.15); color: var(--danger); }
+
+    .session-card.open .chevron { transform: rotate(90deg); }
+
+    .session-body {
+      display: none;
+      padding: 0 16px 16px;
+      border-top: 1px solid var(--border);
+    }
+
+    .session-card.open .session-body { display: block; }
+
+    .session-body .notion-url {
+      display: inline-block;
+      margin: 12px 0 8px;
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .session-body .notion-url:hover { text-decoration: underline; }
+
+    .session-content {
+      margin-top: 12px;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .loading-indicator { color: var(--text-dim); font-style: italic; padding: 12px 0; }
+
+    .empty-state {
+      text-align: center;
+      color: var(--text-dim);
+      padding: 48px 0;
+    }
+
+    /* ── Markdown rendered content ── */
+    .session-content h1, .session-content h2, .session-content h3 {
+      margin: 16px 0 6px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .session-content h1 { font-size: 16px; }
+    .session-content h2 { font-size: 14px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .session-content h3 { font-size: 13px; }
+
+    .session-content p { margin: 6px 0; }
+
+    .session-content ul, .session-content ol {
+      padding-left: 20px;
+      margin: 6px 0;
+    }
+
+    .session-content li { margin: 3px 0; }
+
+    .session-content table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 12px;
+    }
+
+    .session-content th {
+      background: var(--surface2);
+      text-align: left;
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      font-weight: 600;
+    }
+
+    .session-content td {
+      padding: 7px 10px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .session-content tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+
+    .session-content hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 14px 0;
+    }
+
+    .session-content strong { color: #fff; }
+
+    /* ── Preview markdown styles (same as session-content) ── */
+    .preview-box h1, .preview-box h2, .preview-box h3 {
+      margin: 14px 0 5px;
+      font-weight: 600;
+    }
+    .preview-box h2 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+    .preview-box p { margin: 5px 0; }
+    .preview-box ul, .preview-box ol { padding-left: 18px; margin: 5px 0; }
+    .preview-box li { margin: 2px 0; }
+    .preview-box table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 12px; }
+    .preview-box th { background: var(--surface2); text-align: left; padding: 6px 9px; border: 1px solid var(--border); font-weight: 600; }
+    .preview-box td { padding: 6px 9px; border: 1px solid var(--border); vertical-align: top; }
+    .preview-box hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+    .preview-box strong { color: #fff; }
+
+    /* ── Practice tab ───────────────────────────────────────────────────── */
+    #view-practice { display: flex; flex-direction: column; gap: 16px; }
+
+    .practice-mode-bar { display: flex; gap: 6px; }
+
+    .pmode-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 6px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .pmode-btn:hover { color: var(--text); }
+    .pmode-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    .pmode-restart-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 3px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.15s;
+    }
+    .pmode-restart-btn:hover { color: var(--text); }
+
+    /* Shared pmode sections */
+    .pmode-section { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Shared results area inside annotate/generate */
+    .practice-results { display: flex; flex-direction: column; gap: 12px; }
+
+    /* Annotation display */
+    .annotation-display {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      font-size: 17px;
+      line-height: 2.4;
+      color: var(--text);
+      min-height: 56px;
+    }
+
+    /* Weak-form word */
+    .w-weak {
+      color: var(--text-dim);
+      cursor: default;
+      position: relative;
+      border-bottom: 1px dashed var(--text-dim);
+    }
+    .w-weak::after {
+      content: attr(data-ipa);
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 2px 8px;
+      font-size: 13px;
+      white-space: nowrap;
+      color: var(--text);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      z-index: 10;
+    }
+    .w-weak:hover::after { opacity: 1; }
+
+    /* Content word */
+    .w-content { font-weight: 500; }
+
+    /* Catenation arc */
+    .w-link {
+      color: var(--accent);
+      font-size: 13px;
+      vertical-align: super;
+      cursor: default;
+      user-select: none;
+      margin: 0 1px;
+    }
+
+    /* Glottal stop */
+    .w-glottal {
+      color: var(--tag-claude);
+      font-size: 12px;
+      vertical-align: super;
+      cursor: default;
+      user-select: none;
+    }
+
+    /* Annotation legend */
+    .annotation-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+      font-size: 12px;
+      color: var(--text-dim);
+      padding: 2px 0;
+    }
+    .legend-item { display: flex; align-items: center; gap: 5px; }
+
+    /* Practice buttons */
+    .practice-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 9px 18px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.15s;
+      align-self: flex-start;
+    }
+    .practice-btn:hover { background: var(--accent-hover); }
+    .practice-btn:disabled { background: var(--surface2); color: var(--text-dim); cursor: not-allowed; }
+
+    .practice-btn-record { background: var(--danger); }
+    .practice-btn-record:hover { background: #ef9a9a; }
+    .practice-btn-record.recording { background: #b71c1c; }
+
+    .practice-btn-save { background: var(--success); }
+    .practice-btn-save:hover { background: #5dbf76; }
+
+    /* Input row */
+    .practice-input-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    /* Drill */
+    .drill-progress {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .drill-cat-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 100px;
+      background: rgba(91,127,255,0.15);
+      color: var(--accent);
+      text-transform: capitalize;
+    }
+
+    .drill-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .drill-sentence {
+      font-size: 18px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .drill-buttons { display: flex; gap: 10px; flex-wrap: wrap; }
+
+    /* Generate weakness chips */
+    .weakness-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+    .weakness-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 6px 14px;
+      border-radius: 100px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.15s;
+    }
+    .weakness-chip:hover { color: var(--text); border-color: #555; }
+    .weakness-chip.active { background: rgba(91,127,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+    /* Record row */
+    .record-row { display: flex; align-items: center; gap: 12px; }
+    .record-status { font-size: 13px; color: var(--text-dim); }
+    .record-status.live { color: var(--danger); }
+
+    /* Copy status flash */
+    .copy-status { font-size: 12px; color: var(--success); opacity: 0; transition: opacity 0.3s; }
+    .copy-status.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>📖 Reading Practice Tracker</h1>
+  <nav>
+    <button id="tab-log" class="active" onclick="switchTab('log')">Log Session</button>
+    <button id="tab-review" onclick="switchTab('review')">Review</button>
+    <button id="tab-practice" onclick="switchTab('practice')">Practice</button>
+  </nav>
+</header>
+
+<main>
+
+  <!-- ── Log Session view ─────────────────────────────────────────── -->
+  <div id="view-log">
+    <div class="form-panel">
+      <div class="field-row">
+        <div class="field">
+          <label>Session Title</label>
+          <input id="f-title" type="text" placeholder="e.g. BBC News — Climate Story">
+        </div>
+        <div class="field">
+          <label>Date</label>
+          <input id="f-date" type="date">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>LLM Used</label>
+        <select id="f-llm">
+          <option value="">— select —</option>
+          <option value="ChatGPT">ChatGPT</option>
+          <option value="Gemini">Gemini</option>
+          <option value="Claude">Claude</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Passage Text</label>
+        <textarea id="f-passage" class="short" placeholder="The text you read aloud"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Prompt Used</label>
+        <textarea id="f-prompt" class="short" placeholder="The prompt you gave the LLM"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Recording URL</label>
+        <input id="f-recording" type="url" placeholder="Paste link to your OneNote/OneDrive recording (optional)">
+      </div>
+
+      <div class="field">
+        <label>LLM Feedback — paste here, preview on the right →</label>
+        <textarea id="f-feedback" class="tall" placeholder="Paste the LLM's feedback (markdown supported — tables will render)"
+          oninput="updatePreview()"></textarea>
+      </div>
+
+      <div id="save-status" class="status"></div>
+      <button id="save-btn" onclick="saveSession()">Save to Notion</button>
+    </div>
+
+    <div class="preview-panel">
+      <label>Feedback Preview</label>
+      <div id="feedback-preview" class="preview-box empty">Paste feedback on the left to see it rendered here.</div>
+    </div>
+  </div>
+
+  <!-- ── Review view ──────────────────────────────────────────────── -->
+  <div id="view-review" style="display:none">
+    <div class="review-toolbar">
+      <select id="filter-llm" onchange="renderSessionsList()">
+        <option value="">All LLMs</option>
+        <option value="ChatGPT">ChatGPT</option>
+        <option value="Gemini">Gemini</option>
+        <option value="Claude">Claude</option>
+      </select>
+      <button id="refresh-btn" onclick="loadSessions()">↻ Refresh</button>
+    </div>
+    <div id="sessions-list" class="sessions-list"></div>
+  </div>
+
+  <!-- ── Practice view ────────────────────────────────────────────── -->
+  <div id="view-practice" style="display:none">
+
+    <!-- Mode bar -->
+    <div class="practice-mode-bar">
+      <button id="pmbtn-drill"    class="pmode-btn active" onclick="switchPMode('drill')">Drill</button>
+      <button id="pmbtn-annotate" class="pmode-btn"        onclick="switchPMode('annotate')">Annotate</button>
+      <button id="pmbtn-generate" class="pmode-btn"        onclick="switchPMode('generate')">Generate</button>
+    </div>
+
+    <!-- ── Drill mode ── -->
+    <div id="pmode-drill" class="pmode-section">
+      <div class="drill-progress">
+        <span id="drill-counter">Card 1 / 30</span>
+        <span id="drill-cat" class="drill-cat-chip"></span>
+        <button class="pmode-restart-btn" onclick="restartDrill()">↺ Restart</button>
+      </div>
+      <div class="drill-card">
+        <div id="drill-sentence" class="drill-sentence"></div>
+        <div id="drill-annotation" class="annotation-display" style="display:none"></div>
+      </div>
+      <div class="drill-buttons">
+        <button id="drill-reveal-btn" class="practice-btn" onclick="revealDrillCard()">Reveal ↓</button>
+        <button id="drill-got-btn"    class="practice-btn practice-btn-save"   style="display:none" onclick="drillGotIt()">Got it ✓</button>
+        <button id="drill-again-btn"  class="practice-btn practice-btn-record" style="display:none" onclick="drillTryAgain()">Try again ↺</button>
+      </div>
+      <div class="annotation-legend">
+        <span class="legend-item"><span class="w-weak" style="pointer-events:none">the</span> weak form (hover for IPA)</span>
+        <span class="legend-item"><span class="w-content">speak</span> stressed word</span>
+        <span class="legend-item"><span class="w-link">⌒</span> linking</span>
+        <span class="legend-item"><span class="w-glottal">ʔ</span> glottal stop</span>
+      </div>
+    </div>
+
+    <!-- ── Annotate mode ── -->
+    <div id="pmode-annotate" class="pmode-section" style="display:none">
+      <div class="practice-input-row">
+        <div class="field" style="flex:1">
+          <label>Sentence to Practise</label>
+          <textarea id="pa-sentence" class="short" placeholder="Type or paste any sentence…"></textarea>
+        </div>
+        <button class="practice-btn" onclick="doAnnotate()">Annotate</button>
+      </div>
+
+      <div id="pa-results" class="practice-results" style="display:none">
+        <div class="field">
+          <label>Annotated Sentence</label>
+          <div id="pa-annotation" class="annotation-display"></div>
+        </div>
+        <div class="annotation-legend">
+          <span class="legend-item"><span class="w-weak" style="pointer-events:none">the</span> weak form (hover for IPA)</span>
+          <span class="legend-item"><span class="w-content">speak</span> stressed word</span>
+          <span class="legend-item"><span class="w-link">⌒</span> linking</span>
+          <span class="legend-item"><span class="w-glottal">ʔ</span> glottal stop</span>
+        </div>
+        <div class="record-row">
+          <button id="pa-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pa')">● Record</button>
+          <span id="pa-record-status" class="record-status"></span>
+        </div>
+        <audio id="pa-playback" controls style="display:none; width:100%"></audio>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <button class="practice-btn" onclick="copyPrompt('annotate')">Copy Gemini Prompt</button>
+          <span id="pa-copy-status" class="copy-status"></span>
+        </div>
+        <div class="field">
+          <label>Paste Gemini Feedback</label>
+          <textarea id="pa-feedback" class="tall" placeholder="Paste the feedback from Gemini…"></textarea>
+        </div>
+        <div id="pa-save-status" class="status"></div>
+        <button id="pa-save-btn" class="practice-btn practice-btn-save" onclick="savePractice('pa')">Save to Notion</button>
+      </div>
+    </div>
+
+    <!-- ── Generate mode ── -->
+    <div id="pmode-generate" class="pmode-section" style="display:none">
+      <div class="field">
+        <label>Target Weakness</label>
+        <div class="weakness-chips">
+          <button class="weakness-chip" onclick="selectWeakness('schwa')">Schwa / Weak Forms</button>
+          <button class="weakness-chip" onclick="selectWeakness('aspiration')">Aspiration</button>
+          <button class="weakness-chip" onclick="selectWeakness('linking')">Linking</button>
+          <button class="weakness-chip" onclick="selectWeakness('stress')">Stress Timing</button>
+          <button class="weakness-chip" onclick="selectWeakness('glottal')">Glottal Stops</button>
+        </div>
+      </div>
+
+      <div id="pg-results" class="practice-results" style="display:none">
+        <div style="display:flex; align-items:center; gap:10px">
+          <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Generated Passage</label>
+          <button class="pmode-restart-btn" onclick="newPassage()">New Passage ↺</button>
+        </div>
+        <div id="pg-annotation" class="annotation-display"></div>
+        <div class="annotation-legend">
+          <span class="legend-item"><span class="w-weak" style="pointer-events:none">the</span> weak form (hover)</span>
+          <span class="legend-item"><span class="w-content">speak</span> stressed</span>
+          <span class="legend-item"><span class="w-link">⌒</span> linking</span>
+          <span class="legend-item"><span class="w-glottal">ʔ</span> glottal</span>
+        </div>
+        <div class="record-row">
+          <button id="pg-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pg')">● Record</button>
+          <span id="pg-record-status" class="record-status"></span>
+        </div>
+        <audio id="pg-playback" controls style="display:none; width:100%"></audio>
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
+          <button class="practice-btn" onclick="copyPrompt('generate')">Copy Gemini Prompt</button>
+          <span id="pg-copy-status" class="copy-status"></span>
+        </div>
+        <div class="field">
+          <label>Paste Gemini Feedback</label>
+          <textarea id="pg-feedback" class="tall" placeholder="Paste the feedback from Gemini…"></textarea>
+        </div>
+        <div id="pg-save-status" class="status"></div>
+        <button id="pg-save-btn" class="practice-btn practice-btn-save" onclick="savePractice('pg')">Save to Notion</button>
+      </div>
+    </div>
+
+  </div>
+
+</main>
+
+<script>
+  // ── CONFIG — update this after deploying your Worker ───────────────────────
+  const WORKER_URL = "https://reading-tracker-api.sauwing-wong.workers.dev";
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let allSessions = [];
+
+  // ── Tab switching ──────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    const views = { log: "grid", review: "flex", practice: "flex" };
+    Object.keys(views).forEach(t => {
+      document.getElementById("view-" + t).style.display = (t === tab) ? views[t] : "none";
+      document.getElementById("tab-" + t).classList.toggle("active", t === tab);
+    });
+    if (tab === "review" && allSessions.length === 0) loadSessions();
+    if (tab === "practice" && drillDeck.length === 0) initDrill();
+  }
+
+  // ── Markdown preview ───────────────────────────────────────────────────────
+  function updatePreview() {
+    const val = document.getElementById("f-feedback").value.trim();
+    const box = document.getElementById("feedback-preview");
+    if (!val) {
+      box.innerHTML = "Paste feedback on the left to see it rendered here.";
+      box.classList.add("empty");
+    } else {
+      box.innerHTML = marked.parse(val);
+      box.classList.remove("empty");
+    }
+  }
+
+  // ── Save session ───────────────────────────────────────────────────────────
+  async function saveSession() {
+    const btn = document.getElementById("save-btn");
+    const status = document.getElementById("save-status");
+
+    const title = document.getElementById("f-title").value.trim();
+    const date = document.getElementById("f-date").value;
+    const llm = document.getElementById("f-llm").value;
+    const passageText = document.getElementById("f-passage").value.trim();
+    const promptUsed = document.getElementById("f-prompt").value.trim();
+    const feedback = document.getElementById("f-feedback").value.trim();
+    const recordingUrl = document.getElementById("f-recording").value.trim();
+
+    if (!title) {
+      showStatus("error", "Please enter a session title.");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+    status.className = "status";
+
+    try {
+      const res = await fetch(`${WORKER_URL}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, date, llm, passageText, promptUsed, feedback, recordingUrl }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      showStatus("success", "Saved to Notion!");
+      // Clear form
+      ["f-title", "f-passage", "f-prompt", "f-feedback", "f-recording"].forEach(id => document.getElementById(id).value = "");
+      document.getElementById("f-llm").value = "";
+      document.getElementById("f-date").value = "";
+      updatePreview();
+      allSessions = []; // clear cache so Review refreshes
+    } catch (err) {
+      showStatus("error", `Error: ${err.message}`);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save to Notion";
+    }
+  }
+
+  function showStatus(type, msg) {
+    const el = document.getElementById("save-status");
+    el.textContent = msg;
+    el.className = `status ${type}`;
+  }
+
+  // ── Load sessions ──────────────────────────────────────────────────────────
+  async function loadSessions() {
+    const list = document.getElementById("sessions-list");
+    list.innerHTML = '<div class="loading-indicator">Loading sessions…</div>';
+    try {
+      const res = await fetch(`${WORKER_URL}/sessions`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      allSessions = data.sessions;
+      renderSessionsList();
+    } catch (err) {
+      list.innerHTML = `<div class="loading-indicator" style="color:var(--danger)">Error: ${err.message}</div>`;
+    }
+  }
+
+  function renderSessionsList() {
+    const filterLlm = document.getElementById("filter-llm").value;
+    const list = document.getElementById("sessions-list");
+    const filtered = filterLlm ? allSessions.filter(s => s.llm === filterLlm) : allSessions;
+
+    if (!filtered.length) {
+      list.innerHTML = '<div class="empty-state">No sessions found.</div>';
+      return;
+    }
+
+    list.innerHTML = filtered.map(s => `
+      <div class="session-card" id="card-${s.id}">
+        <div class="session-header" onclick="toggleCard('${s.id}')">
+          <span class="chevron">▶</span>
+          <span class="session-title">${escHtml(s.title)}</span>
+          ${s.llm ? `<span class="llm-tag ${s.llm.toLowerCase()}">${s.llm}</span>` : ""}
+          <span class="session-date">${s.date ? formatDate(s.date) : ""}</span>
+          <button class="delete-btn" onclick="deleteSession(event, '${s.id}')">✕</button>
+        </div>
+        <div class="session-body">
+          <a class="notion-url" href="${s.notionUrl}" target="_blank">Open in Notion ↗</a>
+          <div class="session-content" id="content-${s.id}">
+            <div class="loading-indicator">Loading…</div>
+          </div>
+        </div>
+      </div>
+    `).join("");
+  }
+
+  async function toggleCard(id) {
+    const card = document.getElementById(`card-${id}`);
+    const isOpen = card.classList.contains("open");
+
+    if (isOpen) {
+      card.classList.remove("open");
+      return;
+    }
+
+    card.classList.add("open");
+
+    const contentEl = document.getElementById(`content-${id}`);
+    if (contentEl.dataset.loaded) return; // already fetched
+
+    try {
+      const res = await fetch(`${WORKER_URL}/session/${id}`);
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      contentEl.innerHTML = renderBlocks(data.blocks);
+      contentEl.dataset.loaded = "1";
+    } catch (err) {
+      contentEl.innerHTML = `<div style="color:var(--danger)">Error: ${err.message}</div>`;
+    }
+  }
+
+  // ── Notion blocks → HTML ───────────────────────────────────────────────────
+  function richTextToHtml(richText) {
+    return (richText || []).map(t => {
+      let text = escHtml(t.plain_text ?? t.text?.content ?? "");
+      if (t.annotations?.bold) text = `<strong>${text}</strong>`;
+      if (t.annotations?.italic) text = `<em>${text}</em>`;
+      if (t.annotations?.code) text = `<code>${text}</code>`;
+      return text;
+    }).join("");
+  }
+
+  function renderBlocks(blocks) {
+    if (!blocks?.length) return "<p style='color:var(--text-dim)'>No content.</p>";
+    let html = "";
+    let inList = false;
+
+    for (const block of blocks) {
+      const isList = block.type === "bulleted_list_item" || block.type === "numbered_list_item";
+      if (!isList && inList) { html += "</ul>"; inList = false; }
+
+      switch (block.type) {
+        case "heading_1":
+          html += `<h1>${richTextToHtml(block.heading_1.rich_text)}</h1>`; break;
+        case "heading_2":
+          html += `<h2>${richTextToHtml(block.heading_2.rich_text)}</h2>`; break;
+        case "heading_3":
+          html += `<h3>${richTextToHtml(block.heading_3.rich_text)}</h3>`; break;
+        case "paragraph":
+          const txt = richTextToHtml(block.paragraph.rich_text);
+          if (txt) html += `<p>${txt}</p>`; break;
+        case "bulleted_list_item":
+          if (!inList) { html += "<ul>"; inList = true; }
+          html += `<li>${richTextToHtml(block.bulleted_list_item.rich_text)}</li>`; break;
+        case "numbered_list_item":
+          if (!inList) { html += "<ul>"; inList = true; }
+          html += `<li>${richTextToHtml(block.numbered_list_item.rich_text)}</li>`; break;
+        case "divider":
+          html += "<hr>"; break;
+        case "table":
+          html += renderTableBlock(block); break;
+        default: break;
+      }
+    }
+
+    if (inList) html += "</ul>";
+    return html;
+  }
+
+  function renderTableBlock(block) {
+    if (!block.children?.length) return "";
+    let html = "<table>";
+    block.children.forEach((row, i) => {
+      html += i === 0 ? "<thead><tr>" : (i === 1 ? "</thead><tbody><tr>" : "<tr>");
+      (row.table_row?.cells ?? []).forEach(cell => {
+        const tag = i === 0 ? "th" : "td";
+        html += `<${tag}>${richTextToHtml(cell)}</${tag}>`;
+      });
+      html += i === 0 ? "</tr>" : "</tr>";
+    });
+    html += "</tbody></table>";
+    return html;
+  }
+
+  // ── Delete session ─────────────────────────────────────────────────────────
+  async function deleteSession(event, id) {
+    event.stopPropagation();
+    if (!confirm("Delete this session? This cannot be undone.")) return;
+    try {
+      const res = await fetch(`${WORKER_URL}/session/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      allSessions = allSessions.filter(s => s.id !== id);
+      renderSessionsList();
+    } catch (err) {
+      alert("Error deleting: " + err.message);
+    }
+  }
+
+  // ── Utilities ──────────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  }
+
+  function formatDate(iso) {
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+  }
+
+  // ── Init — set today's date ────────────────────────────────────────────────
+  document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
+
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // ── PRACTICE TAB ────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+
+  // ── Annotation engine ──────────────────────────────────────────────────────
+  const WEAK_FORMS = {
+    the: "/ðə/", a: "/ə/", an: "/ən/", to: "/tə/", for: "/fə/",
+    of: "/əv/", and: "/ən/", but: "/bət/", was: "/wəz/", were: "/wə/",
+    at: "/ət/", from: "/frəm/", with: "/wɪð/", that: "/ðət/", have: "/həv/",
+    am: "/əm/", are: "/ə/", can: "/kən/", would: "/wəd/", should: "/ʃəd/"
+  };
+
+  const CONSONANT_ENDS = new Set("bdvgklmnprstz".split(""));
+  const VOWEL_STARTS   = new Set("aeiou".split(""));
+
+  function tokenise(sentence) {
+    return sentence.trim().split(/\s+/).map(chunk => {
+      const m = chunk.match(/^([^a-zA-Z]*)([a-zA-Z][a-zA-Z']*)([^a-zA-Z']*)$/);
+      if (!m) return { isWord: false, raw: chunk };
+      const [, before, core, after] = m;
+      const lower = core.toLowerCase();
+      const ipa   = WEAK_FORMS[lower] ?? null;
+      return { isWord: true, raw: chunk, before, core, after, lower, isWeak: !!ipa, ipa, linkAfter: false, glottalAfter: false };
+    });
+  }
+
+  function linkingPass(tokens) {
+    const words = tokens.filter(t => t.isWord);
+    for (let i = 0; i < words.length - 1; i++) {
+      const curr = words[i], next = words[i + 1];
+      const last  = curr.lower[curr.lower.length - 1];
+      const first = next.lower[0];
+      if (CONSONANT_ENDS.has(last) && VOWEL_STARTS.has(first)) {
+        curr.linkAfter = true;
+      } else if (last === "t" && !VOWEL_STARTS.has(first)) {
+        curr.glottalAfter = true;
+      }
+    }
+  }
+
+  function renderAnnotation(tokens) {
+    const parts = [];
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (!t.isWord) { parts.push(escHtml(t.raw)); parts.push(" "); continue; }
+      const cls  = t.isWeak ? "w-weak" : "w-content";
+      const attr = t.isWeak ? ` data-ipa="${t.ipa}"` : "";
+      let html = escHtml(t.before);
+      html += `<span class="${cls}"${attr}>${escHtml(t.core)}</span>`;
+      if (t.glottalAfter) html += '<span class="w-glottal">ʔ</span>';
+      html += escHtml(t.after);
+      parts.push(html);
+      if (i < tokens.length - 1) {
+        parts.push(t.linkAfter ? '<span class="w-link" title="catenation / linking">⌒</span>' : " ");
+      }
+    }
+    return parts.join("");
+  }
+
+  function annotateInto(sentence, targetId) {
+    const tokens = tokenise(sentence);
+    linkingPass(tokens);
+    document.getElementById(targetId).innerHTML = renderAnnotation(tokens);
+  }
+
+  // ── Sub-mode switching ─────────────────────────────────────────────────────
+  function switchPMode(mode) {
+    ["drill", "annotate", "generate"].forEach(m => {
+      document.getElementById("pmode-" + m).style.display = m === mode ? "flex" : "none";
+      document.getElementById("pmbtn-" + m).classList.toggle("active", m === mode);
+    });
+    if (mode === "drill" && drillDeck.length === 0) initDrill();
+  }
+
+  // ── DRILL MODE ─────────────────────────────────────────────────────────────
+  const DRILL_DECK = [
+    // Schwa / Weak Forms (10)
+    { cat: "schwa", text: "She went to the station to get a ticket for the train." },
+    { cat: "schwa", text: "I was on my way to work when I heard the news." },
+    { cat: "schwa", text: "Can you pass the salt and the butter to me, please?" },
+    { cat: "schwa", text: "He was a bit tired and had to stop for a rest." },
+    { cat: "schwa", text: "She said that she would be at the office by nine." },
+    { cat: "schwa", text: "I think that was the best film I have ever seen." },
+    { cat: "schwa", text: "We should be there by the time that he arrives." },
+    { cat: "schwa", text: "The cat was sitting on the mat next to the fire." },
+    { cat: "schwa", text: "He said he had been to the shops but could not find what he was looking for." },
+    { cat: "schwa", text: "It was a nice day and she had a cup of tea at the café." },
+    // Catenation / Linking (6)
+    { cat: "linking", text: "Pick it up and put it on the table over there." },
+    { cat: "linking", text: "Turn it off and leave it alone until it cools down." },
+    { cat: "linking", text: "Come on in and sit down wherever you like." },
+    { cat: "linking", text: "She held it up and looked at it from every angle." },
+    { cat: "linking", text: "Get it out and lay it on a flat surface." },
+    { cat: "linking", text: "Stand up and walk over to the other end of the room." },
+    // Glottal Stops (6)
+    { cat: "glottal", text: "I got to admit that it was a bit of a let-down." },
+    { cat: "glottal", text: "It's not the right time to get back to that yet." },
+    { cat: "glottal", text: "He sat down and put the flat iron on the mat." },
+    { cat: "glottal", text: "What time did you get that report in to the committee?" },
+    { cat: "glottal", text: "I thought it might be better to cut that part out." },
+    { cat: "glottal", text: "It's not quite what I had in mind but it's a start." },
+    // Aspiration (4)
+    { cat: "aspiration", text: "Peter picked a particularly peculiar piece of pottery." },
+    { cat: "aspiration", text: "Could you tell Tommy to tidy the table by teatime?" },
+    { cat: "aspiration", text: "Kate kept the cat calm and carried it carefully outside." },
+    { cat: "aspiration", text: "Paul painted the parlour a pretty pale shade of pink." },
+    // Stress Timing (4)
+    { cat: "stress", text: "The train was late and the staff were very sorry." },
+    { cat: "stress", text: "She bought a new coat because the old one was torn." },
+    { cat: "stress", text: "He said he would call but he never did." },
+    { cat: "stress", text: "We need to talk about what happened at the meeting." },
+  ];
+
+  let drillDeck  = [];
+  let drillIndex = 0;
+
+  function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+
+  function initDrill() {
+    drillDeck  = [...DRILL_DECK];
+    shuffleArray(drillDeck);
+    drillIndex = 0;
+    showDrillCard();
+  }
+
+  function showDrillCard() {
+    const card = drillDeck[drillIndex];
+    document.getElementById("drill-counter").textContent   = `Card ${drillIndex + 1} / ${drillDeck.length}`;
+    document.getElementById("drill-cat").textContent       = card.cat;
+    document.getElementById("drill-sentence").textContent  = card.text;
+    document.getElementById("drill-annotation").style.display = "none";
+    document.getElementById("drill-annotation").innerHTML  = "";
+    document.getElementById("drill-reveal-btn").style.display = "";
+    document.getElementById("drill-got-btn").style.display    = "none";
+    document.getElementById("drill-again-btn").style.display  = "none";
+  }
+
+  function revealDrillCard() {
+    const card = drillDeck[drillIndex];
+    annotateInto(card.text, "drill-annotation");
+    document.getElementById("drill-annotation").style.display = "block";
+    document.getElementById("drill-reveal-btn").style.display = "none";
+    document.getElementById("drill-got-btn").style.display    = "";
+    document.getElementById("drill-again-btn").style.display  = "";
+  }
+
+  function drillGotIt() {
+    if (drillIndex < drillDeck.length - 1) {
+      drillIndex++;
+      showDrillCard();
+    } else {
+      document.getElementById("drill-sentence").textContent = "Deck complete! Press Restart to go again.";
+      document.getElementById("drill-annotation").style.display = "none";
+      document.getElementById("drill-reveal-btn").style.display = "none";
+      document.getElementById("drill-got-btn").style.display    = "none";
+      document.getElementById("drill-again-btn").style.display  = "none";
+      document.getElementById("drill-counter").textContent = `Done! ${drillDeck.length} / ${drillDeck.length}`;
+      document.getElementById("drill-cat").textContent = "";
+    }
+  }
+
+  function drillTryAgain() {
+    // Move current card to end of remaining deck
+    const card = drillDeck.splice(drillIndex, 1)[0];
+    drillDeck.push(card);
+    showDrillCard();
+  }
+
+  function restartDrill() { initDrill(); }
+
+  // ── ANNOTATE MODE ──────────────────────────────────────────────────────────
+  function doAnnotate() {
+    const sentence = document.getElementById("pa-sentence").value.trim();
+    if (!sentence) return;
+    annotateInto(sentence, "pa-annotation");
+    document.getElementById("pa-results").style.display = "flex";
+    // Reset recording UI
+    const audio = document.getElementById("pa-playback");
+    audio.style.display = "none";
+    audio.src = "";
+  }
+
+  // ── GENERATE MODE ──────────────────────────────────────────────────────────
+  const PRACTICE_PASSAGES = {
+    schwa: [
+      "She was on her way to the office and had to stop at the bank for a moment.",
+      "I told him that we should be at the station by a quarter to nine.",
+      "They said that it was going to be a long day and that we had to be prepared.",
+    ],
+    aspiration: [
+      "Peter picked a particularly peculiar piece of pottery at the car boot sale.",
+      "Could Tommy please take two tickets to the theatre for Thursday's performance?",
+      "Kate carefully carried the kitten past the kitchen and put it on the carpet.",
+    ],
+    linking: [
+      "Pick it up and pass it over to Anna on your left.",
+      "Come on in and sit it on any available surface in the office.",
+      "Turn it off and open it up to check if anything is out of order.",
+    ],
+    stress: [
+      "The train was late and the staff were very sorry about the inconvenience.",
+      "She bought a new coat because the old one was torn beyond repair.",
+    ],
+    glottal: [
+      "I got to admit that it was a bit of a let-down at that point.",
+      "What time did you get that report in to the committee at the district office?",
+      "I thought it might be better to cut that part out and start again at the right point.",
+    ],
+  };
+
+  const WEAKNESS_LABELS = {
+    schwa:       "Schwa and weak forms — reducing unstressed function words to /ə/",
+    aspiration:  "Aspiration — adding a puff of air to /p/, /t/, /k/ at stressed syllable onsets",
+    linking:     "Catenation and linking — connecting consonant-final words to vowel-initial words",
+    stress:      "Stress timing — making content words prominent and squashing function words",
+    glottal:     "Glottal stops — replacing syllable-final /t/ before consonants with [ʔ]",
+  };
+
+  let currentWeakness     = null;
+  let currentPassageIndex = null;
+
+  function selectWeakness(key) {
+    currentWeakness = key;
+    document.querySelectorAll(".weakness-chip").forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("onclick").includes(`'${key}'`));
+    });
+    const passages = PRACTICE_PASSAGES[key];
+    currentPassageIndex = Math.floor(Math.random() * passages.length);
+    showGeneratePassage();
+  }
+
+  function newPassage() {
+    if (!currentWeakness) return;
+    const passages = PRACTICE_PASSAGES[currentWeakness];
+    let newIdx;
+    do { newIdx = Math.floor(Math.random() * passages.length); }
+    while (passages.length > 1 && newIdx === currentPassageIndex);
+    currentPassageIndex = newIdx;
+    showGeneratePassage();
+  }
+
+  function showGeneratePassage() {
+    const sentence = PRACTICE_PASSAGES[currentWeakness][currentPassageIndex];
+    annotateInto(sentence, "pg-annotation");
+    document.getElementById("pg-results").style.display = "flex";
+    const audio = document.getElementById("pg-playback");
+    audio.style.display = "none";
+    audio.src = "";
+  }
+
+  // ── RECORDING (shared) ─────────────────────────────────────────────────────
+  let practiceRecorder  = null;
+  let practiceChunks    = [];
+  let practiceStream    = null;
+  let practiceRecording = false;
+  let practiceTimer     = null;
+  let practicePrefix    = null;
+
+  async function toggleRecording(prefix) {
+    if (practiceRecording) {
+      stopRecording();
+    } else {
+      await startRecording(prefix);
+    }
+  }
+
+  async function startRecording(prefix) {
+    try {
+      practiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      document.getElementById(prefix + "-record-status").textContent = "Microphone access denied.";
+      return;
+    }
+    practicePrefix  = prefix;
+    practiceChunks  = [];
+    const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+      ? "audio/webm;codecs=opus" : "audio/webm";
+    practiceRecorder = new MediaRecorder(practiceStream, { mimeType: mime });
+    practiceRecorder.ondataavailable = e => { if (e.data.size > 0) practiceChunks.push(e.data); };
+    practiceRecorder.onstop = () => {
+      const blob  = new Blob(practiceChunks, { type: practiceRecorder.mimeType });
+      const url   = URL.createObjectURL(blob);
+      const audio = document.getElementById(practicePrefix + "-playback");
+      audio.src = url;
+      audio.style.display = "block";
+    };
+    practiceRecorder.start(100);
+    practiceRecording = true;
+
+    const btn = document.getElementById(prefix + "-record-btn");
+    btn.textContent = "■ Stop";
+    btn.classList.add("recording");
+
+    let secs = 0;
+    const statusEl = document.getElementById(prefix + "-record-status");
+    practiceTimer = setInterval(() => {
+      secs++;
+      const m = String(Math.floor(secs / 60)).padStart(2, "0");
+      const s = String(secs % 60).padStart(2, "0");
+      statusEl.textContent = `Recording… ${m}:${s}`;
+      statusEl.classList.add("live");
+    }, 1000);
+  }
+
+  function stopRecording() {
+    clearInterval(practiceTimer);
+    practiceRecorder.stop();
+    practiceStream.getTracks().forEach(t => t.stop());
+    practiceRecording = false;
+
+    const btn = document.getElementById(practicePrefix + "-record-btn");
+    btn.textContent = "● Record";
+    btn.classList.remove("recording");
+
+    const statusEl = document.getElementById(practicePrefix + "-record-status");
+    statusEl.textContent = "";
+    statusEl.classList.remove("live");
+  }
+
+  // ── GEMINI PROMPT ──────────────────────────────────────────────────────────
+  function buildGeminiPrompt(sentence, weakness) {
+    const focusLine = weakness
+      ? `\nThis passage was specifically designed to practise: **${WEAKNESS_LABELS[weakness]}**.\n`
+      : "";
+    return `You are a British English (SSBE/RP) pronunciation coach.
+
+I recorded myself reading the following sentence aloud:
+"${sentence}"
+${focusLine}
+Please evaluate my recording on these five areas only. For each: one-line verdict, one specific example from the sentence, and one actionable tip.
+
+1. **Schwa / weak forms** — Did I reduce unstressed function words ("to", "the", "a", "was", "for", "of", "and") to their weak forms with /ə/?
+2. **Aspiration** — Did I add a clear puff of air to /p/, /t/, /k/ at the start of stressed syllables?
+3. **Catenation / linking** — Did I link consonant-final words smoothly into vowel-initial words (e.g. "pick it up" → /pɪkɪtʌp/)?
+4. **Stress timing** — Does the rhythm feel stress-timed? Are content words clearly more prominent than function words?
+5. **Glottal stops** — Did I replace syllable-final /t/ before consonants with a glottal stop [ʔ], as is natural in modern SSBE?`;
+  }
+
+  function copyPrompt(mode) {
+    let sentence, weakness = null;
+    if (mode === "annotate") {
+      sentence = document.getElementById("pa-sentence").value.trim();
+    } else {
+      sentence = currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : "";
+      weakness = currentWeakness;
+    }
+    if (!sentence) return;
+
+    const prompt   = buildGeminiPrompt(sentence, weakness);
+    const statusId = mode === "annotate" ? "pa-copy-status" : "pg-copy-status";
+
+    const showCopied = () => {
+      const el = document.getElementById(statusId);
+      el.textContent = "Copied!";
+      el.classList.add("visible");
+      setTimeout(() => el.classList.remove("visible"), 2000);
+    };
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(prompt).then(showCopied).catch(() => fallbackCopy(prompt, showCopied));
+    } else {
+      fallbackCopy(prompt, showCopied);
+    }
+  }
+
+  function fallbackCopy(text, callback) {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); callback(); } catch(e) {}
+    document.body.removeChild(ta);
+  }
+
+  // ── SAVE PRACTICE SESSION ──────────────────────────────────────────────────
+  async function savePractice(prefix) {
+    const isGen    = prefix === "pg";
+    const sentence = isGen
+      ? (currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : "")
+      : document.getElementById("pa-sentence").value.trim();
+    const feedback = document.getElementById(prefix + "-feedback").value.trim();
+    const weakness = isGen ? currentWeakness : null;
+
+    if (!sentence) {
+      setPracticeStatus(prefix, "error", "No sentence to save.");
+      return;
+    }
+
+    const btn = document.getElementById(prefix + "-save-btn");
+    btn.disabled = true;
+    btn.textContent = "Saving…";
+
+    const modeLabel = isGen ? "Generate" : "Annotate";
+    const weakLabel = weakness ? " — " + weakness : "";
+    const today     = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+    try {
+      const res = await fetch(`${WORKER_URL}/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title:       `Practice — ${modeLabel}${weakLabel} — ${today}`,
+          date:        new Date().toISOString().slice(0, 10),
+          llm:         "Gemini",
+          passageText: sentence,
+          promptUsed:  buildGeminiPrompt(sentence, weakness),
+          feedback:    feedback,
+          recordingUrl: "",
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      setPracticeStatus(prefix, "success", "Saved to Notion!");
+      document.getElementById(prefix + "-feedback").value = "";
+      allSessions = [];
+    } catch (err) {
+      setPracticeStatus(prefix, "error", "Error: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Save to Notion";
+    }
+  }
+
+  function setPracticeStatus(prefix, type, msg) {
+    const el = document.getElementById(prefix + "-save-status");
+    el.textContent = msg;
+    el.className = `status ${type}`;
+  }
+</script>
+
+</body>
+</html>
