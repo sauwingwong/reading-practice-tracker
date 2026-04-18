@@ -16702,6 +16702,35 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   }
 
   // ── TTS / LISTEN ───────────────────────────────────────────────────────────
+  // localStorage cache: key = "tts_{model}_{sentence}", value = base64 PCM
+  // Caps at 60 entries; evicts oldest when full. Silently degrades if storage unavailable.
+  const TTS_CACHE_PREFIX = "tts_";
+  const TTS_CACHE_MAX    = 60;
+
+  function ttsCacheKey(sentence, model) {
+    return TTS_CACHE_PREFIX + (model || "quick") + "_" + sentence.trim();
+  }
+
+  function ttsGetCache(sentence, model) {
+    try { return localStorage.getItem(ttsCacheKey(sentence, model)); } catch { return null; }
+  }
+
+  function ttsSetCache(sentence, model, base64) {
+    try {
+      const key = ttsCacheKey(sentence, model);
+      const allKeys = Object.keys(localStorage).filter(k => k.startsWith(TTS_CACHE_PREFIX));
+      if (allKeys.length >= TTS_CACHE_MAX) localStorage.removeItem(allKeys[0]);
+      localStorage.setItem(key, base64);
+    } catch {
+      // Storage full — clear TTS cache and retry once
+      try {
+        Object.keys(localStorage).filter(k => k.startsWith(TTS_CACHE_PREFIX))
+              .forEach(k => localStorage.removeItem(k));
+        localStorage.setItem(ttsCacheKey(sentence, model), base64);
+      } catch {}
+    }
+  }
+
   // Gemini TTS returns raw PCM (24kHz, 16-bit, mono) as base64.
   // We wrap it in a WAV container before playing.
   function pcmToWavUrl(base64) {
@@ -16725,6 +16754,14 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   async function listenSentence(sentence, btnEl, model) {
     if (!sentence) return;
     const orig = btnEl.textContent;
+
+    // Check cache first — instant replay, no API call
+    const cached = ttsGetCache(sentence, model);
+    if (cached) {
+      new Audio(pcmToWavUrl(cached)).play();
+      return;
+    }
+
     btnEl.textContent = "Loading…";
     btnEl.disabled = true;
     try {
@@ -16735,9 +16772,8 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || `TTS error ${res.status}`); }
       const base64 = await res.text();
-      const url = pcmToWavUrl(base64);
-      const audio = new Audio(url);
-      audio.play();
+      ttsSetCache(sentence, model, base64); // store for future clicks
+      new Audio(pcmToWavUrl(base64)).play();
     } catch (err) {
       alert("Listen failed: " + err.message);
     } finally {
