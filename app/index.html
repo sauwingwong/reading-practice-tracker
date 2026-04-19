@@ -746,22 +746,35 @@
     <!-- ── Generate mode ── -->
     <div id="pmode-generate" class="pmode-section" style="display:none">
       <div class="field">
-        <label>Target Weakness</label>
+        <label>Length</label>
         <div class="weakness-chips">
-          <button class="weakness-chip" onclick="selectWeakness('schwa')">Schwa / Weak Forms</button>
-          <button class="weakness-chip" onclick="selectWeakness('aspiration')">Aspiration</button>
-          <button class="weakness-chip" onclick="selectWeakness('linking')">Linking</button>
-          <button class="weakness-chip" onclick="selectWeakness('stress')">Stress Timing</button>
-          <button class="weakness-chip" onclick="selectWeakness('glottal')">Glottal Stops</button>
+          <button id="glen-sentence" class="weakness-chip active" onclick="setGenerateLength('sentence')">Sentence (single weakness)</button>
+          <button id="glen-passage"  class="weakness-chip"        onclick="setGenerateLength('passage')">Passage — 500 words (multiple)</button>
         </div>
+      </div>
+
+      <div class="field">
+        <label id="pg-weakness-label">Target Weakness</label>
+        <div class="weakness-chips">
+          <button class="weakness-chip" data-weakness="schwa"      onclick="toggleWeakness('schwa', this)">Schwa / Weak Forms</button>
+          <button class="weakness-chip" data-weakness="aspiration" onclick="toggleWeakness('aspiration', this)">Aspiration</button>
+          <button class="weakness-chip" data-weakness="linking"    onclick="toggleWeakness('linking', this)">Linking</button>
+          <button class="weakness-chip" data-weakness="stress"     onclick="toggleWeakness('stress', this)">Stress Timing</button>
+          <button class="weakness-chip" data-weakness="glottal"    onclick="toggleWeakness('glottal', this)">Glottal Stops</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <button id="pg-generate-btn" class="practice-btn practice-btn-save" onclick="generatePassage()">✨ Generate</button>
+        <span id="pg-generate-status" class="record-status"></span>
       </div>
 
       <div id="pg-results" class="practice-results" style="display:none">
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
-          <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Generated Passage</label>
-          <button class="pmode-restart-btn" onclick="newPassage()">New Passage ↺</button>
-          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'gcp')"  title="Google Cloud · British RP · ~20k sentences/month free">🔊 Listen</button>
-          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
+          <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)" id="pg-results-label">Generated</label>
+          <button class="pmode-restart-btn" onclick="generatePassage()">Regenerate ↺</button>
+          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentGeneratedText, this, 'gcp')"  title="Google Cloud · British RP · ~20k sentences/month free">🔊 Listen</button>
+          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentGeneratedText, this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
         </div>
         <div id="pg-annotation" class="annotation-display"></div>
         <div class="annotation-legend">
@@ -16533,36 +16546,97 @@
     glottal:     "Glottal stops — replacing syllable-final /t/ before consonants with [ʔ]",
   };
 
-  let currentWeakness     = null;
-  let currentPassageIndex = null;
+  let currentGeneratedText = "";              // the text currently shown in pg-annotation
+  let currentWeakness      = null;             // single weakness key (sentence mode) — also used by savePractice
+  let selectedWeaknesses   = new Set();        // multi-select set for passage mode
+  let generateLength       = "sentence";       // "sentence" | "passage"
 
-  function selectWeakness(key) {
-    currentWeakness = key;
-    document.querySelectorAll(".weakness-chip").forEach(btn => {
-      btn.classList.toggle("active", btn.getAttribute("onclick").includes(`'${key}'`));
+  function setGenerateLength(mode) {
+    generateLength = mode;
+    document.getElementById("glen-sentence").classList.toggle("active", mode === "sentence");
+    document.getElementById("glen-passage").classList.toggle("active",  mode === "passage");
+    document.getElementById("pg-weakness-label").textContent =
+      mode === "passage" ? "Target Weaknesses (select one or more)" : "Target Weakness (select one)";
+    document.getElementById("pg-results-label").textContent =
+      mode === "passage" ? "Generated Passage" : "Generated Sentence";
+    // When switching to sentence mode, collapse selection to at most one
+    if (mode === "sentence" && selectedWeaknesses.size > 1) {
+      const [first] = selectedWeaknesses;
+      selectedWeaknesses = new Set([first]);
+      refreshWeaknessChips();
+    }
+  }
+
+  function toggleWeakness(key, btn) {
+    if (generateLength === "sentence") {
+      // radio-style: clear others
+      selectedWeaknesses = new Set([key]);
+      currentWeakness = key;
+    } else {
+      // multi-select
+      if (selectedWeaknesses.has(key)) selectedWeaknesses.delete(key);
+      else selectedWeaknesses.add(key);
+      currentWeakness = selectedWeaknesses.size === 1 ? [...selectedWeaknesses][0] : null;
+    }
+    refreshWeaknessChips();
+  }
+
+  function refreshWeaknessChips() {
+    document.querySelectorAll("#pmode-generate .weakness-chip[data-weakness]").forEach(btn => {
+      btn.classList.toggle("active", selectedWeaknesses.has(btn.dataset.weakness));
     });
-    const passages = PRACTICE_PASSAGES[key];
-    currentPassageIndex = Math.floor(Math.random() * passages.length);
-    showGeneratePassage();
   }
 
-  function newPassage() {
-    if (!currentWeakness) return;
-    const passages = PRACTICE_PASSAGES[currentWeakness];
-    let newIdx;
-    do { newIdx = Math.floor(Math.random() * passages.length); }
-    while (passages.length > 1 && newIdx === currentPassageIndex);
-    currentPassageIndex = newIdx;
-    showGeneratePassage();
-  }
-
-  function showGeneratePassage() {
-    const sentence = PRACTICE_PASSAGES[currentWeakness][currentPassageIndex];
-    annotateInto(sentence, "pg-annotation");
-    document.getElementById("pg-results").style.display = "flex";
-    const audio = document.getElementById("pg-playback");
-    audio.src = "";
-    document.getElementById("pg-playback-row").style.display = "none";
+  async function generatePassage() {
+    if (selectedWeaknesses.size === 0) {
+      alert("Pick at least one weakness first.");
+      return;
+    }
+    const btn    = document.getElementById("pg-generate-btn");
+    const status = document.getElementById("pg-generate-status");
+    btn.disabled = true;
+    btn.textContent = "Generating…";
+    status.textContent = "";
+    try {
+      const res = await fetch(`${WORKER_URL}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          weaknesses: [...selectedWeaknesses],
+          length:     generateLength,
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(e.error || `Generate error ${res.status}`);
+      }
+      const { text } = await res.json();
+      if (!text) throw new Error("Empty response");
+      currentGeneratedText = text;
+      annotateInto(text, "pg-annotation");
+      document.getElementById("pg-results").style.display = "flex";
+      const audio = document.getElementById("pg-playback");
+      audio.src = "";
+      document.getElementById("pg-playback-row").style.display = "none";
+    } catch (err) {
+      // Graceful fallback to hardcoded pool (sentence mode, single weakness only)
+      if (generateLength === "sentence" && selectedWeaknesses.size === 1) {
+        const k = [...selectedWeaknesses][0];
+        const pool = PRACTICE_PASSAGES[k];
+        if (pool?.length) {
+          const fallback = pool[Math.floor(Math.random() * pool.length)];
+          currentGeneratedText = fallback;
+          annotateInto(fallback, "pg-annotation");
+          document.getElementById("pg-results").style.display = "flex";
+          status.textContent = `(offline fallback — ${err.message})`;
+          return;
+        }
+      }
+      alert("Generate failed: " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "✨ Generate";
+    }
   }
 
   // ── RECORDING (shared) ─────────────────────────────────────────────────────
@@ -16669,8 +16743,8 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     if (mode === "annotate") {
       sentence = document.getElementById("pa-sentence").value.trim();
     } else {
-      sentence = currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : "";
-      weakness = currentWeakness;
+      sentence = currentGeneratedText;
+      weakness = [...selectedWeaknesses].join("+") || null;
     }
     if (!sentence) return;
 
@@ -16807,10 +16881,10 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   async function savePractice(prefix) {
     const isGen    = prefix === "pg";
     const sentence = isGen
-      ? (currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : "")
+      ? currentGeneratedText
       : document.getElementById("pa-sentence").value.trim();
     const feedback = document.getElementById(prefix + "-feedback").value.trim();
-    const weakness = isGen ? currentWeakness : null;
+    const weakness = isGen ? [...selectedWeaknesses].join("+") || null : null;
 
     if (!sentence) {
       setPracticeStatus(prefix, "error", "No sentence to save.");

@@ -14,6 +14,9 @@
  *   POST /tts          — synthesise British English speech
  *                          body { sentence, model: "gcp" | "quick" | "full" }
  *                          returns { format: "mp3" | "pcm16", data: "<base64>" }
+ *   POST /generate     — generate a British English practice sentence / passage
+ *                          body { weaknesses: string[], length: "sentence" | "passage" }
+ *                          returns { text: "..." }
  */
 
 const NOTION_API = "https://api.notion.com/v1";
@@ -257,6 +260,96 @@ async function handleGeminiTts(sentence, model, env) {
   return Response.json({ format: "pcm16", data: b64 });
 }
 
+// ─── Gemini text generation (practice sentences & passages) ────────────────────
+// POST /generate
+//   body: { weaknesses: string[], length: "sentence" | "passage" }
+//   returns: { text: "..." }
+
+const WEAKNESS_BRIEFS = {
+  schwa:      "unstressed function words (of, to, for, was, the, a, and, from) reducing to /ə/ in connected speech",
+  aspiration: "word-initial stressed /p/, /t/, /k/ that receive strong aspiration (e.g. pick, time, cat, park, tickets)",
+  linking:    "consonant-to-vowel word boundaries (catenation) and vowel-to-vowel intrusive /r/, /w/, /j/ linking",
+  stress:     "alternating stressed content words and weak-form function words to create English stress-timed rhythm",
+  glottal:    "syllable-final /t/ before consonants that native RP speakers glottalise to [ʔ] (e.g. quite good, that man, get back)",
+};
+
+async function handleGenerate(request, env) {
+  const { weaknesses, length } = await request.json();
+  if (!Array.isArray(weaknesses) || weaknesses.length === 0) {
+    return Response.json({ error: "No weaknesses selected" }, { status: 400 });
+  }
+  if (!env.GEMINI_API_KEY) {
+    return Response.json({ error: "Missing GEMINI_API_KEY secret" }, { status: 500 });
+  }
+
+  const briefs = weaknesses
+    .map(k => WEAKNESS_BRIEFS[k])
+    .filter(Boolean);
+  if (briefs.length === 0) {
+    return Response.json({ error: "Unknown weakness key(s)" }, { status: 400 });
+  }
+
+  const prompt = length === "passage"
+    ? buildPassagePrompt(briefs)
+    : buildSentencePrompt(briefs[0]);
+
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.9,          // high variety
+            maxOutputTokens: 1200,     // ~600 words of headroom for 500-word passage
+          },
+        }),
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      return Response.json({ error: `Gemini generate failed: ${errText}` }, { status: 502 });
+    }
+    const json = await res.json();
+    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) return Response.json({ error: "Empty generation response" }, { status: 502 });
+
+    // Strip accidental wrapping quotes / markdown fences
+    const cleaned = text
+      .replace(/^```[a-zA-Z]*\n?/, "")
+      .replace(/\n?```$/, "")
+      .replace(/^["']|["']$/g, "")
+      .trim();
+    return Response.json({ text: cleaned });
+  } catch (err) {
+    return Response.json({ error: err.message || String(err) }, { status: 502 });
+  }
+}
+
+function buildSentencePrompt(brief) {
+  return `Generate exactly ONE natural British English sentence (10–20 words) suitable for pronunciation practice.
+The sentence MUST be rich in: ${brief}.
+Use everyday conversational vocabulary. Pick a fresh mundane topic (e.g. weekend errands, a café, commuting, the weather, cooking, a phone call).
+Output ONLY the sentence itself — no quotes, no explanation, no heading.`;
+}
+
+function buildPassagePrompt(briefs) {
+  const features = briefs.map((b, i) => `  ${i + 1}. ${b}`).join("\n");
+  return `Write a natural British English practice passage of ABOUT 500 WORDS (accept 450–550).
+Split into 4–6 short paragraphs.
+Pick a fresh mundane everyday topic — vary it each time (e.g. a weekend train journey, a visit to the café, cooking a meal, a phone call with a friend, running errands, waiting at the post office, a rainy afternoon at home).
+
+The passage MUST distribute the following pronunciation features naturally and densely across the text:
+${features}
+
+Use natural connected speech that a native RP speaker would produce. Do NOT explain the features, do NOT annotate, do NOT add headings or a title. Output ONLY the passage prose.`;
+}
+
 // ─── Route handlers ────────────────────────────────────────────────────────────
 
 async function handlePostSession(request, env) {
@@ -397,6 +490,8 @@ export default {
         res = await handleGetSession(id, env);
       } else if (request.method === "POST" && url.pathname === "/tts") {
         res = await handleTts(request, env);
+      } else if (request.method === "POST" && url.pathname === "/generate") {
+        res = await handleGenerate(request, env);
       } else {
         res = Response.json({ error: "Not found" }, { status: 404 });
       }
