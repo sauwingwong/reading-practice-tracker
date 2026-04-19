@@ -305,8 +305,9 @@ async function handleGenerate(request, env) {
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.9,          // high variety
-            maxOutputTokens: 1200,     // ~600 words of headroom for 500-word passage
+            temperature: 0.9,          // high variety across regenerations
+            maxOutputTokens: 4000,     // generous — 500-word passage ≈ 750 tokens, but thinking tokens also count
+            thinkingConfig: { thinkingBudget: 0 }, // disable internal reasoning; this is a shallow task
           },
         }),
       }
