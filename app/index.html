@@ -687,8 +687,8 @@
         <button id="drill-reveal-btn" class="practice-btn" onclick="revealDrillCard()" disabled title="Record yourself first, then reveal">Reveal ↓</button>
         <button id="drill-got-btn"    class="practice-btn practice-btn-save"   style="display:none" onclick="drillGotIt()">Got it ✓</button>
         <button id="drill-again-btn"  class="practice-btn practice-btn-record" style="display:none" onclick="drillTryAgain()">Try again ↺</button>
-        <button id="drill-listen-quick" class="practice-btn" style="display:none" onclick="drillListen('quick')" title="Gemini 2.5 · best for single sentences · high rate limit">🔊 Quick</button>
-        <button id="drill-listen-full"  class="practice-btn" style="display:none" onclick="drillListen('full')"  title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
+        <button id="drill-listen-gcp"  class="practice-btn" style="display:none" onclick="drillListen('gcp')"  title="Google Cloud · British RP · ~20k sentences/month free">🔊 Listen</button>
+        <button id="drill-listen-full" class="practice-btn" style="display:none" onclick="drillListen('full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
       </div>
       <div class="annotation-legend">
         <span class="legend-item"><span class="w-weak" style="pointer-events:none">the</span> weak form</span>
@@ -707,7 +707,7 @@
           <textarea id="pa-sentence" class="short" placeholder="Type or paste any sentence…"></textarea>
         </div>
         <button class="practice-btn" onclick="doAnnotate()">Annotate</button>
-        <button class="practice-btn" onclick="listenSentence(document.getElementById('pa-sentence').value.trim(), this, 'quick')" title="Gemini 2.5 · best for single sentences · high rate limit">🔊 Quick</button>
+        <button class="practice-btn" onclick="listenSentence(document.getElementById('pa-sentence').value.trim(), this, 'gcp')"  title="Google Cloud · British RP · ~20k sentences/month free">🔊 Listen</button>
         <button class="practice-btn" onclick="listenSentence(document.getElementById('pa-sentence').value.trim(), this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
       </div>
 
@@ -760,7 +760,7 @@
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
           <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Generated Passage</label>
           <button class="pmode-restart-btn" onclick="newPassage()">New Passage ↺</button>
-          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'quick')" title="Gemini 2.5 · best for single sentences · high rate limit">🔊 Quick</button>
+          <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'gcp')"  title="Google Cloud · British RP · ~20k sentences/month free">🔊 Listen</button>
           <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentWeakness ? PRACTICE_PASSAGES[currentWeakness][currentPassageIndex] : '', this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
         </div>
         <div id="pg-annotation" class="annotation-display"></div>
@@ -16433,7 +16433,7 @@
     revealBtn.title          = "Record yourself first, then reveal";
     document.getElementById("drill-got-btn").style.display    = "none";
     document.getElementById("drill-again-btn").style.display  = "none";
-    document.getElementById("drill-listen-quick").style.display = "none";
+    document.getElementById("drill-listen-gcp").style.display = "none";
     document.getElementById("drill-listen-full").style.display  = "none";
     // Reset recording UI
     document.getElementById("drill-playback-row").style.display = "none";
@@ -16449,13 +16449,13 @@
     document.getElementById("drill-reveal-btn").style.display = "none";
     document.getElementById("drill-got-btn").style.display    = "";
     document.getElementById("drill-again-btn").style.display  = "";
-    document.getElementById("drill-listen-quick").style.display = "";
+    document.getElementById("drill-listen-gcp").style.display = "";
     document.getElementById("drill-listen-full").style.display  = "";
   }
 
   function drillListen(model) {
     const card = drillDeck[drillIndex];
-    const btnId = model === "full" ? "drill-listen-full" : "drill-listen-quick";
+    const btnId = model === "full" ? "drill-listen-full" : "drill-listen-gcp";
     listenSentence(card.text, document.getElementById(btnId), model);
   }
 
@@ -16469,7 +16469,7 @@
       document.getElementById("drill-reveal-btn").style.display = "none";
       document.getElementById("drill-got-btn").style.display    = "none";
       document.getElementById("drill-again-btn").style.display  = "none";
-      document.getElementById("drill-listen-quick").style.display = "none";
+      document.getElementById("drill-listen-gcp").style.display = "none";
       document.getElementById("drill-listen-full").style.display  = "none";
       document.getElementById("drill-counter").textContent = `Done! ${drillDeck.length} / ${drillDeck.length}`;
       document.getElementById("drill-cat").textContent = "";
@@ -16702,37 +16702,48 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   }
 
   // ── TTS / LISTEN ───────────────────────────────────────────────────────────
-  // localStorage cache: key = "tts_{model}_{sentence}", value = base64 PCM
-  // Caps at 60 entries; evicts oldest when full. Silently degrades if storage unavailable.
+  // Worker returns { format: "mp3" | "pcm16", data: "<base64>" }.
+  //   - "mp3"   → plays directly via data: URL  (Google Cloud TTS)
+  //   - "pcm16" → wrapped in a WAV header client-side (Gemini TTS)
+  //
+  // localStorage cache: key = "tts_{model}_{sentence}", value = JSON envelope.
+  // Caps at 60 entries; evicts oldest when full. Silently degrades if storage
+  // unavailable or legacy (non-JSON) value encountered.
   const TTS_CACHE_PREFIX = "tts_";
   const TTS_CACHE_MAX    = 60;
 
   function ttsCacheKey(sentence, model) {
-    return TTS_CACHE_PREFIX + (model || "quick") + "_" + sentence.trim();
+    return TTS_CACHE_PREFIX + (model || "gcp") + "_" + sentence.trim();
   }
 
   function ttsGetCache(sentence, model) {
-    try { return localStorage.getItem(ttsCacheKey(sentence, model)); } catch { return null; }
+    try {
+      const raw = localStorage.getItem(ttsCacheKey(sentence, model));
+      if (!raw) return null;
+      const env = JSON.parse(raw);
+      if (env && env.format && env.data) return env;
+      return null;    // legacy (pre-envelope) entry — treat as miss
+    } catch { return null; }
   }
 
-  function ttsSetCache(sentence, model, base64) {
+  function ttsSetCache(sentence, model, envelope) {
     try {
       const key = ttsCacheKey(sentence, model);
       const allKeys = Object.keys(localStorage).filter(k => k.startsWith(TTS_CACHE_PREFIX));
       if (allKeys.length >= TTS_CACHE_MAX) localStorage.removeItem(allKeys[0]);
-      localStorage.setItem(key, base64);
+      localStorage.setItem(key, JSON.stringify(envelope));
     } catch {
       // Storage full — clear TTS cache and retry once
       try {
         Object.keys(localStorage).filter(k => k.startsWith(TTS_CACHE_PREFIX))
               .forEach(k => localStorage.removeItem(k));
-        localStorage.setItem(ttsCacheKey(sentence, model), base64);
+        localStorage.setItem(ttsCacheKey(sentence, model), JSON.stringify(envelope));
       } catch {}
     }
   }
 
   // Gemini TTS returns raw PCM (24kHz, 16-bit, mono) as base64.
-  // We wrap it in a WAV container before playing.
+  // Wrap it in a WAV container before playing.
   function pcmToWavUrl(base64) {
     const raw = atob(base64);
     const pcm = new Uint8Array(raw.length);
@@ -16751,14 +16762,20 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     return URL.createObjectURL(new Blob([buf], { type: "audio/wav" }));
   }
 
+  function ttsEnvelopeToUrl({ format, data }) {
+    return format === "mp3"
+      ? "data:audio/mp3;base64," + data
+      : pcmToWavUrl(data);
+  }
+
   async function listenSentence(sentence, btnEl, model) {
     if (!sentence) return;
     const orig = btnEl.textContent;
 
-    // Check cache first — instant replay, no API call
+    // Cache hit → instant replay, no API call
     const cached = ttsGetCache(sentence, model);
     if (cached) {
-      new Audio(pcmToWavUrl(cached)).play();
+      new Audio(ttsEnvelopeToUrl(cached)).play();
       return;
     }
 
@@ -16770,10 +16787,14 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sentence, model }),
       });
-      if (!res.ok) { const e = await res.json().catch(() => ({ error: res.statusText })); throw new Error(e.error || `TTS error ${res.status}`); }
-      const base64 = await res.text();
-      ttsSetCache(sentence, model, base64); // store for future clicks
-      new Audio(pcmToWavUrl(base64)).play();
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(e.error || `TTS error ${res.status}`);
+      }
+      const envelope = await res.json();
+      if (!envelope?.data) throw new Error("Empty audio response");
+      ttsSetCache(sentence, model, envelope);
+      new Audio(ttsEnvelopeToUrl(envelope)).play();
     } catch (err) {
       alert("Listen failed: " + err.message);
     } finally {

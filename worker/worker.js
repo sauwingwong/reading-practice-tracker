@@ -2,15 +2,18 @@
  * Cloudflare Worker — Reading Practice Tracker
  *
  * Required Worker secrets (set in Cloudflare dashboard):
- *   NOTION_TOKEN       — your Notion integration token (secret_xxx...)
- *   NOTION_DATABASE_ID — the UUID of the Sessions database
- *   GEMINI_API_KEY     — your Google AI Studio API key (for TTS)
+ *   NOTION_TOKEN        — your Notion integration token (secret_xxx...)
+ *   NOTION_DATABASE_ID  — the UUID of the Sessions database
+ *   GEMINI_API_KEY      — your Google AI Studio API key (for Gemini TTS fallback)
+ *   GCP_API_KEY         — Google Cloud API key restricted to Cloud Text-to-Speech API
  *
  * Routes:
  *   POST /session      — create a new session in Notion
  *   GET  /sessions     — list sessions (properties only)
  *   GET  /session/:id  — get one session with full block content
- *   POST /tts          — synthesise British English speech via Gemini TTS
+ *   POST /tts          — synthesise British English speech
+ *                          body { sentence, model: "gcp" | "quick" | "full" }
+ *                          returns { format: "mp3" | "pcm16", data: "<base64>" }
  */
 
 const NOTION_API = "https://api.notion.com/v1";
@@ -161,7 +164,13 @@ function textBlocks(content) {
   return chunks;
 }
 
-// ─── Gemini TTS handler ────────────────────────────────────────────────────────
+// ─── TTS: Google Cloud (primary) + Gemini (fallback) ───────────────────────────
+//
+// Response envelope (all branches):
+//   { format: "mp3" | "pcm16", data: "<base64>" }
+//
+// Browser plays "mp3" directly as a data URL; "pcm16" (24kHz/16-bit/mono) is
+// wrapped in a WAV header client-side before playback.
 
 async function handleTts(request, env) {
   const { sentence, model } = await request.json();
@@ -169,15 +178,57 @@ async function handleTts(request, env) {
     return Response.json({ error: "No sentence provided" }, { status: 400 });
   }
 
-  // "full" uses 3.1 (richer, 3 RPM free tier); default "quick" uses 2.5 (faster, higher limit)
+  try {
+    if (model === "full" || model === "quick") {
+      return await handleGeminiTts(sentence, model, env);
+    }
+    // Default: Google Cloud TTS (en-GB Neural2)
+    return await handleGcpTts(sentence, env);
+  } catch (err) {
+    return Response.json({ error: err.message || String(err) }, { status: 502 });
+  }
+}
+
+// ─── Google Cloud TTS ──────────────────────────────────────────────────────────
+// Voice: en-GB-Neural2-C (female British English RP).
+// Free tier: 1M Neural2 chars/month. Returns base64-encoded MP3.
+// Auth: restricted API key passed as ?key= query param.
+
+async function handleGcpTts(sentence, env) {
+  if (!env.GCP_API_KEY) throw new Error("Missing GCP_API_KEY secret");
+
+  const res = await fetch(
+    `https://texttospeech.googleapis.com/v1/text:synthesize?key=${env.GCP_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        input: { text: sentence },
+        voice: { languageCode: "en-GB", name: "en-GB-Neural2-C" },
+        audioConfig: { audioEncoding: "MP3" },
+      }),
+    }
+  );
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`GCP TTS failed: ${errText}`);
+  }
+  const data = await res.json();
+  if (!data.audioContent) throw new Error("GCP TTS returned no audio");
+  return Response.json({ format: "mp3", data: data.audioContent });
+}
+
+// ─── Gemini TTS (legacy / premium fallback) ────────────────────────────────────
+
+async function handleGeminiTts(sentence, model, env) {
+  // "full" → 3.1 (richer, 3 RPM free tier); "quick" → 2.5 (faster, higher limit)
   const modelName = model === "full"
     ? "gemini-3.1-flash-tts-preview"
     : "gemini-2.5-flash-preview-tts";
 
-  // Prefix instructs the model to use British English (RP) pronunciation
   const text = `Speak in British English (Received Pronunciation): ${sentence}`;
 
-  const geminiRes = await fetch(
+  const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`,
     {
       method: "POST",
@@ -190,30 +241,20 @@ async function handleTts(request, env) {
         generationConfig: {
           responseModalities: ["AUDIO"],
           speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: "Kore" },
-            },
+            voiceConfig: { prebuiltVoiceConfig: { voiceName: "Kore" } },
           },
         },
       }),
     }
   );
-
-  if (!geminiRes.ok) {
-    const errText = await geminiRes.text();
-    return Response.json({ error: `Gemini TTS failed: ${errText}` }, { status: 502 });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini TTS failed: ${errText}`);
   }
-
-  const data = await geminiRes.json();
-  const audioBase64 = data?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-  if (!audioBase64) {
-    return Response.json({ error: "No audio in Gemini response" }, { status: 502 });
-  }
-
-  // Return raw base64-encoded PCM (24kHz / 16-bit / mono) — browser wraps in WAV
-  return new Response(audioBase64, {
-    headers: { "Content-Type": "text/plain" },
-  });
+  const json = await res.json();
+  const b64 = json?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  if (!b64) throw new Error("No audio in Gemini response");
+  return Response.json({ format: "pcm16", data: b64 });
 }
 
 // ─── Route handlers ────────────────────────────────────────────────────────────
