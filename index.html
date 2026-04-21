@@ -766,6 +766,7 @@
       <div class="record-row">
         <button id="drill-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('drill')">● Record</button>
         <span id="drill-record-status" class="record-status"></span>
+        <button id="drill-score-btn" class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="runPracticeInstantScore('drill')" title="Speak the sentence now for an instant word-by-word score">🎙️ Score</button>
         <button id="drill-deep-btn" class="practice-btn" style="display:none; padding:4px 12px; font-size:12px" onclick="practiceDeepScore('drill')" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>
       </div>
       <div id="drill-score-panel"></div>
@@ -815,6 +816,7 @@
         <div class="record-row">
           <button id="pa-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pa')">● Record</button>
           <span id="pa-record-status" class="record-status"></span>
+          <button id="pa-score-btn" class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="runPracticeInstantScore('pa')" title="Speak the sentence now for an instant word-by-word score">🎙️ Score</button>
           <button id="pa-deep-btn" class="practice-btn" style="display:none; padding:4px 12px; font-size:12px" onclick="practiceDeepScore('pa')" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>
         </div>
         <div id="pa-score-panel"></div>
@@ -880,6 +882,7 @@
         <div class="record-row">
           <button id="pg-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pg')">● Record</button>
           <span id="pg-record-status" class="record-status"></span>
+          <button id="pg-score-btn" class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="runPracticeInstantScore('pg')" title="Speak the sentence now for an instant word-by-word score">🎙️ Score</button>
           <button id="pg-deep-btn" class="practice-btn" style="display:none; padding:4px 12px; font-size:12px" onclick="practiceDeepScore('pg')" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>
         </div>
         <div id="pg-score-panel"></div>
@@ -16951,40 +16954,48 @@
       statusEl.classList.add("live");
     }, 1000);
 
-    // Also run Web Speech recognition for instant word-level scoring
-    const target = getPracticeTarget(prefix);
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    // NOTE: Web Speech recognition is NOT run concurrently with MediaRecorder.
+    // On Windows, both competing for the mic caused choppy captures. The
+    // instant word-diff score is still available on-demand after recording
+    // via the 🎙️ Score button (calls runPracticeInstantScore).
     practiceRecognizer = null;
-    if (SR && target) {
-      try {
-        const r = new SR();
-        r.lang = "en-GB";
-        r.interimResults = false;
-        r.maxAlternatives = 1;
-        r.continuous = true; // keep listening for longer passages
-        const transcripts = [];
-        r.onresult = (e) => {
-          for (let i = e.resultIndex; i < e.results.length; i++) {
-            if (e.results[i].isFinal) transcripts.push(e.results[i][0].transcript);
-          }
-        };
-        r.onerror = (e) => {
-          const panel = document.getElementById(prefix + "-score-panel");
-          paintScoreInto(panel, { pct: 0, diff: [], error: e.error || "speech error" });
-        };
-        r.onend = () => {
-          const panel = document.getElementById(prefix + "-score-panel");
-          if (!panel) return;
-          const full = transcripts.join(" ").trim();
-          if (full) {
-            const result = scoreLine(target, full);
-            paintScoreInto(panel, result);
-          }
-        };
-        r.start();
-        practiceRecognizer = r;
-      } catch (_) { practiceRecognizer = null; }
+  }
+
+  // Instant word-diff score via Web Speech API, triggered after recording
+  // so it doesn't fight the MediaRecorder for the mic.
+  function runPracticeInstantScore(prefix) {
+    const target = getPracticeTarget(prefix);
+    if (!target) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const panel = document.getElementById(prefix + "-score-panel");
+    if (!SR) {
+      paintScoreInto(panel, { pct: 0, diff: [], error: "Speech recognition unavailable — use Chrome/Edge." });
+      return;
     }
+    const btn = document.getElementById(prefix + "-score-btn");
+    const origLabel = btn ? btn.textContent : "";
+    if (btn) btn.textContent = "🎙️ Listening…";
+    const r = new SR();
+    r.lang = "en-GB";
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    r.continuous = true;
+    const transcripts = [];
+    r.onresult = (e) => {
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) transcripts.push(e.results[i][0].transcript);
+      }
+    };
+    r.onerror = (e) => {
+      if (btn) btn.textContent = origLabel;
+      paintScoreInto(panel, { pct: 0, diff: [], error: e.error || "speech error" });
+    };
+    r.onend = () => {
+      if (btn) btn.textContent = origLabel;
+      const full = transcripts.join(" ").trim();
+      if (full) paintScoreInto(panel, scoreLine(target, full));
+    };
+    try { r.start(); } catch (_) { if (btn) btn.textContent = origLabel; }
   }
 
   function stopRecording() {
