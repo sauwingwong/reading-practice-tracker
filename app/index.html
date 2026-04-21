@@ -16788,7 +16788,7 @@
   const practiceLastBlob = {}; // prefix -> { blob, mime, target }
 
   function getPracticeTarget(prefix) {
-    if (prefix === "drill") return currentDrillCard ? currentDrillCard.text : "";
+    if (prefix === "drill") return (drillDeck && drillDeck[drillIndex]) ? drillDeck[drillIndex].text : "";
     if (prefix === "pa")    return document.getElementById("pa-sentence").value.trim();
     if (prefix === "pg")    return currentGeneratedText || "";
     return "";
