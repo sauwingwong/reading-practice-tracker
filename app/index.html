@@ -16892,7 +16892,18 @@
 
   async function startRecording(prefix) {
     try {
-      practiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Request a clean high-quality mono stream. Turning off DSP processing
+      // avoids the "chopping" that browser noise suppression / AGC can introduce
+      // on reading-practice speech with natural pauses.
+      practiceStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl:  false,
+          channelCount:     1,
+          sampleRate:       48000,
+        },
+      });
     } catch (e) {
       document.getElementById(prefix + "-record-status").textContent = "Microphone access denied.";
       return;
@@ -16901,7 +16912,10 @@
     practiceChunks  = [];
     const mime = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
       ? "audio/webm;codecs=opus" : "audio/webm";
-    practiceRecorder = new MediaRecorder(practiceStream, { mimeType: mime });
+    practiceRecorder = new MediaRecorder(practiceStream, {
+      mimeType:            mime,
+      audioBitsPerSecond:  128000,
+    });
     practiceRecorder.ondataavailable = e => { if (e.data.size > 0) practiceChunks.push(e.data); };
     practiceRecorder.onstop = () => {
       const blob = new Blob(practiceChunks, { type: practiceRecorder.mimeType });
@@ -16919,7 +16933,8 @@
       const deepBtn = document.getElementById(practicePrefix + "-deep-btn");
       if (deepBtn) deepBtn.style.display = "inline-block";
     };
-    practiceRecorder.start(100);
+    // No timeslice: one final chunk on stop avoids inter-chunk micro-gaps.
+    practiceRecorder.start();
     practiceRecording = true;
 
     const btn = document.getElementById(prefix + "-record-btn");
