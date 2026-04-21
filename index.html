@@ -754,8 +754,9 @@
     <!-- ── Drill mode ── -->
     <div id="pmode-drill" class="pmode-section">
       <div class="drill-progress">
-        <span id="drill-counter">Card 1 / 30</span>
+        <span id="drill-counter">Card 1 / 100</span>
         <span id="drill-cat" class="drill-cat-chip"></span>
+        <button id="drill-back-btn" class="pmode-restart-btn" onclick="drillBack()" disabled title="Previous card">← Back</button>
         <button class="pmode-restart-btn" onclick="restartDrill()">↺ Restart</button>
       </div>
       <div class="drill-card">
@@ -16489,7 +16490,7 @@
 
   // ── DRILL MODE ─────────────────────────────────────────────────────────────
   const DRILL_DECK = [
-    // Schwa / Weak Forms (10)
+    // Schwa / Weak Forms (30)
     { cat: "schwa", text: "She went to the station to get a ticket for the train." },
     { cat: "schwa", text: "I was on my way to work when I heard the news." },
     { cat: "schwa", text: "Can you pass the salt and the butter to me, please?" },
@@ -16500,30 +16501,100 @@
     { cat: "schwa", text: "The cat was sitting on the mat next to the fire." },
     { cat: "schwa", text: "He said he had been to the shops but could not find what he was looking for." },
     { cat: "schwa", text: "It was a nice day and she had a cup of tea at the café." },
-    // Catenation / Linking (6)
+    { cat: "schwa", text: "I was about to leave when the phone began to ring." },
+    { cat: "schwa", text: "They were on the bus for the best part of an hour." },
+    { cat: "schwa", text: "She was going to ask him but decided against it." },
+    { cat: "schwa", text: "There was a bit of a queue at the post office." },
+    { cat: "schwa", text: "He was from a small village to the north of the city." },
+    { cat: "schwa", text: "I have been meaning to ring her for a couple of weeks." },
+    { cat: "schwa", text: "We were told to wait in the hall for the results." },
+    { cat: "schwa", text: "She must have left before the end of the programme." },
+    { cat: "schwa", text: "The letter was from a friend she had not seen for years." },
+    { cat: "schwa", text: "I was going to make a cup of tea for the both of us." },
+    { cat: "schwa", text: "He had to borrow a tenner from a bloke at the pub." },
+    { cat: "schwa", text: "The fella at the desk was as helpful as he could be." },
+    { cat: "schwa", text: "I would have gone with them if I had been asked." },
+    { cat: "schwa", text: "She was going to wear the blue one but changed her mind." },
+    { cat: "schwa", text: "It was the sort of thing that could happen to anyone." },
+    { cat: "schwa", text: "He was a teacher at a school in the middle of town." },
+    { cat: "schwa", text: "I had been working on the garden for most of the morning." },
+    { cat: "schwa", text: "We were talking about a holiday for later in the year." },
+    { cat: "schwa", text: "She was one of the first to arrive at the party." },
+    { cat: "schwa", text: "The tea was on the table by the time she came in." },
+    // Catenation / Linking (20)
     { cat: "linking", text: "Pick it up and put it on the table over there." },
     { cat: "linking", text: "Turn it off and leave it alone until it cools down." },
     { cat: "linking", text: "Come on in and sit down wherever you like." },
     { cat: "linking", text: "She held it up and looked at it from every angle." },
     { cat: "linking", text: "Get it out and lay it on a flat surface." },
     { cat: "linking", text: "Stand up and walk over to the other end of the room." },
-    // Glottal Stops (6)
+    { cat: "linking", text: "Hand it over and I'll have a look at it for you." },
+    { cat: "linking", text: "Fill it up and bring it back when you're done." },
+    { cat: "linking", text: "Hold on a minute and I'll check it out for you." },
+    { cat: "linking", text: "Put it away and we can sort it out in the morning." },
+    { cat: "linking", text: "Roll it up and pop it in the bag on the chair." },
+    { cat: "linking", text: "Take it off and hang it up behind the door." },
+    { cat: "linking", text: "Switch it on and give it a minute to warm up." },
+    { cat: "linking", text: "Open it up and have a quick look inside." },
+    { cat: "linking", text: "Work it out on a piece of paper if it helps." },
+    { cat: "linking", text: "Shut it off and unplug it at the wall." },
+    { cat: "linking", text: "Bring it in and set it on the counter by the till." },
+    { cat: "linking", text: "Tidy it up and throw away anything that's broken." },
+    { cat: "linking", text: "Read it over and tell me if it makes any sense." },
+    { cat: "linking", text: "Carry on and finish it off before the end of the day." },
+    // Glottal Stops (20)
     { cat: "glottal", text: "I got to admit that it was a bit of a let-down." },
     { cat: "glottal", text: "It's not the right time to get back to that yet." },
     { cat: "glottal", text: "He sat down and put the flat iron on the mat." },
     { cat: "glottal", text: "What time did you get that report in to the committee?" },
     { cat: "glottal", text: "I thought it might be better to cut that part out." },
     { cat: "glottal", text: "It's not quite what I had in mind but it's a start." },
-    // Aspiration (4)
+    { cat: "glottal", text: "That button on the jacket needs a bit of a stitch." },
+    { cat: "glottal", text: "I bought a bottle of water at the shop on the corner." },
+    { cat: "glottal", text: "She put a little bit of butter on the hot toast." },
+    { cat: "glottal", text: "The kitten got stuck behind the radiator in the flat." },
+    { cat: "glottal", text: "He forgot to get the batteries for the remote." },
+    { cat: "glottal", text: "I'll nip out and get that sorted by half past eight." },
+    { cat: "glottal", text: "That certainly wasn't what I had been told at the meeting." },
+    { cat: "glottal", text: "The waiter brought a plate of chips and a pot of tea." },
+    { cat: "glottal", text: "She sat right at the back of the cinema on a Saturday." },
+    { cat: "glottal", text: "I've got to catch the late train up to Edinburgh tonight." },
+    { cat: "glottal", text: "He met her outside the gate at about a quarter to eight." },
+    { cat: "glottal", text: "A lot of what he said didn't quite add up to me." },
+    { cat: "glottal", text: "She had to put the cat out before she set off for work." },
+    { cat: "glottal", text: "They got a flat on the outskirts of the city last autumn." },
+    // Aspiration (15)
     { cat: "aspiration", text: "Peter picked a particularly peculiar piece of pottery." },
     { cat: "aspiration", text: "Could you tell Tommy to tidy the table by teatime?" },
     { cat: "aspiration", text: "Kate kept the cat calm and carried it carefully outside." },
     { cat: "aspiration", text: "Paul painted the parlour a pretty pale shade of pink." },
-    // Stress Timing (4)
+    { cat: "aspiration", text: "Tim took two trays of tarts to the party by taxi." },
+    { cat: "aspiration", text: "Polly packed her case and popped out to post a parcel." },
+    { cat: "aspiration", text: "The kind king kept the crown in a curious copper case." },
+    { cat: "aspiration", text: "Ted turned the television on to catch the tennis at teatime." },
+    { cat: "aspiration", text: "Cathy cooked a couple of courses for the Christmas party." },
+    { cat: "aspiration", text: "Patrick put the papers on the piano before he popped upstairs." },
+    { cat: "aspiration", text: "Terry told Tina to take the tin to the top of the table." },
+    { cat: "aspiration", text: "Carl carried the carpet across the corridor and up the stairs." },
+    { cat: "aspiration", text: "The porter picked up the parcel and passed it to the postman." },
+    { cat: "aspiration", text: "Keen to please, Kevin carried the kettle to the kitchen." },
+    { cat: "aspiration", text: "Pam poured a pot of piping hot tea for her parents." },
+    // Stress Timing (15)
     { cat: "stress", text: "The train was late and the staff were very sorry." },
     { cat: "stress", text: "She bought a new coat because the old one was torn." },
     { cat: "stress", text: "He said he would call but he never did." },
     { cat: "stress", text: "We need to talk about what happened at the meeting." },
+    { cat: "stress", text: "I told him I would sort it out by the end of the week." },
+    { cat: "stress", text: "She asked me whether I had read the book she had lent me." },
+    { cat: "stress", text: "The car broke down on the motorway just outside of London." },
+    { cat: "stress", text: "He tried to explain the problem but nobody was listening." },
+    { cat: "stress", text: "I think we should leave before the traffic gets too bad." },
+    { cat: "stress", text: "She always said that honesty was the best policy in the end." },
+    { cat: "stress", text: "The shop closes early on Sundays but opens late on Mondays." },
+    { cat: "stress", text: "He reckons the match will be called off because of the weather." },
+    { cat: "stress", text: "My sister lives in a flat above a bakery in Manchester." },
+    { cat: "stress", text: "The committee has decided to review the proposal next Thursday." },
+    { cat: "stress", text: "I reckon we'll have a proper chat about it over the weekend." },
   ];
 
   let drillDeck     = [];
@@ -16565,6 +16636,22 @@
     document.getElementById("drill-playback-row").style.display = "none";
     const audio = document.getElementById("drill-playback");
     if (audio) audio.src = "";
+    // Clear any previous card's score + deep-score feedback
+    const sp = document.getElementById("drill-score-panel");
+    if (sp) sp.innerHTML = "";
+    const deepBtn = document.getElementById("drill-deep-btn");
+    if (deepBtn) deepBtn.style.display = "none";
+    delete practiceLastBlob["drill"];
+    // Back button: disabled on first card
+    const backBtn = document.getElementById("drill-back-btn");
+    if (backBtn) backBtn.disabled = (drillIndex === 0);
+  }
+
+  function drillBack() {
+    if (drillIndex > 0) {
+      drillIndex--;
+      showDrillCard();
+    }
   }
 
   function revealDrillCard() {
