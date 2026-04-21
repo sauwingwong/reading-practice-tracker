@@ -16632,10 +16632,20 @@
     document.getElementById("drill-again-btn").style.display  = "none";
     document.getElementById("drill-listen-gcp").style.display = "none";
     document.getElementById("drill-listen-full").style.display  = "none";
-    // Reset recording UI
+    // Reset recording UI — revoke old blob URL first to avoid handle leak
     document.getElementById("drill-playback-row").style.display = "none";
     const audio = document.getElementById("drill-playback");
-    if (audio) audio.src = "";
+    if (audio) {
+      if (audio.src && audio.src.startsWith("blob:")) {
+        try { URL.revokeObjectURL(audio.src); } catch (_) {}
+      }
+      audio.src = "";
+    }
+    const dl = document.getElementById("drill-download");
+    if (dl && dl.href && dl.href.startsWith("blob:")) {
+      try { URL.revokeObjectURL(dl.href); } catch (_) {}
+      dl.removeAttribute("href");
+    }
     // Clear any previous card's score + deep-score feedback
     const sp = document.getElementById("drill-score-panel");
     if (sp) sp.innerHTML = "";
@@ -16923,20 +16933,39 @@
       if (e.data.size > 0) queueMicrotask(() => practiceChunks.push(e.data));
     };
     practiceRecorder.onstop = () => {
-      const blob = new Blob(practiceChunks, { type: practiceRecorder.mimeType });
-      const url  = URL.createObjectURL(blob);
+      const mime = practiceRecorder.mimeType;
+      const blob = new Blob(practiceChunks, { type: mime });
+      // Free previously-created blob URLs before creating a new one —
+      // otherwise every recording leaks a blob handle, which over many
+      // recordings starves Chrome's audio subsystem and the mic goes choppy.
       const audio = document.getElementById(practicePrefix + "-playback");
       const dl    = document.getElementById(practicePrefix + "-download");
       const row   = document.getElementById(practicePrefix + "-playback-row");
+      if (audio && audio.src && audio.src.startsWith("blob:")) {
+        try { URL.revokeObjectURL(audio.src); } catch (_) {}
+      }
+      if (dl && dl.href && dl.href.startsWith("blob:")) {
+        try { URL.revokeObjectURL(dl.href); } catch (_) {}
+      }
+      const url = URL.createObjectURL(blob);
       audio.src = url;
       dl.href   = url;
       row.style.display = "flex";
       // Stash for Deep Score
       practiceLastBlob[practicePrefix] = {
-        blob, mime: practiceRecorder.mimeType, target: getPracticeTarget(practicePrefix),
+        blob, mime, target: getPracticeTarget(practicePrefix),
       };
       const deepBtn = document.getElementById(practicePrefix + "-deep-btn");
       if (deepBtn) deepBtn.style.display = "inline-block";
+      // Drop the recorder's internal chunk references so they can GC.
+      practiceChunks = [];
+      // Fully detach the recorder from this closure — lets Chrome release
+      // its internal audio-pump state back to the OS between recordings.
+      try {
+        practiceRecorder.ondataavailable = null;
+        practiceRecorder.onstop = null;
+      } catch (_) {}
+      practiceRecorder = null;
     };
     // 1s timeslice: flushes memory periodically (so long recordings don't
     // buffer indefinitely and stutter) while keeping chunk boundaries rare
@@ -17040,8 +17069,33 @@
 
   function stopRecording() {
     clearInterval(practiceTimer);
-    practiceRecorder.stop();
-    practiceStream.getTracks().forEach(t => t.stop());
+    practiceTimer = null;
+
+    // Fire the recorder stop (onstop will build the blob and then null the
+    // recorder reference itself to allow Chrome to release audio state).
+    try { if (practiceRecorder && practiceRecorder.state !== "inactive") practiceRecorder.stop(); } catch (_) {}
+
+    // Fully tear down the mic stream. Stopping tracks isn't always enough —
+    // also drop the stream reference so Chrome garbage-collects its
+    // internal audio-pump handle between recordings. Leaving handles alive
+    // across many recordings is what causes the "first few are clean, then
+    // chopping creeps in" pattern.
+    if (practiceStream) {
+      try { practiceStream.getTracks().forEach(t => t.stop()); } catch (_) {}
+      practiceStream = null;
+    }
+
+    // Stop and drop the recognizer too.
+    if (practiceRecognizer) {
+      try { practiceRecognizer.stop(); } catch (_) {}
+      try {
+        practiceRecognizer.onresult = null;
+        practiceRecognizer.onerror  = null;
+        practiceRecognizer.onend    = null;
+      } catch (_) {}
+      practiceRecognizer = null;
+    }
+
     practiceRecording = false;
 
     const btn = document.getElementById(practicePrefix + "-record-btn");
@@ -17051,10 +17105,6 @@
     const statusEl = document.getElementById(practicePrefix + "-record-status");
     statusEl.textContent = "";
     statusEl.classList.remove("live");
-
-    if (practiceRecognizer) {
-      try { practiceRecognizer.stop(); } catch (_) {}
-    }
 
     // Drill gate: unlock Reveal after first recording
     if (practicePrefix === "drill") {
