@@ -570,6 +570,91 @@
     /* Copy status flash */
     .copy-status { font-size: 12px; color: var(--success); opacity: 0; transition: opacity 0.3s; }
     .copy-status.visible { opacity: 1; }
+
+    /* ── Role-play ── */
+    .rp-topic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; }
+    .rp-topic-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 13px;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .rp-topic-chip:hover { color: var(--text); border-color: #555; }
+    .rp-topic-chip.active { background: rgba(91,127,255,0.15); border-color: var(--accent); color: var(--accent); }
+    .rp-topic-chip .rp-topic-cat { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; opacity: 0.7; display: block; margin-bottom: 2px; }
+
+    .rp-role-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .rp-role-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 6px 16px;
+      border-radius: 100px;
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .rp-role-btn.active { background: rgba(91,127,255,0.15); border-color: var(--accent); color: var(--accent); }
+
+    .rp-dialogue {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+    .rp-line {
+      padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .rp-line-header { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim); }
+    .rp-line-text { font-size: 15px; line-height: 1.5; color: var(--text); }
+    .rp-line-mine { background: rgba(91,127,255,0.08); border-color: rgba(91,127,255,0.35); }
+    .rp-line-mine .rp-line-header { color: var(--accent); }
+    .rp-line-buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .rp-line-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 3px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .rp-line-btn:hover { color: var(--text); border-color: #555; }
+    .rp-line-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .rp-score {
+      margin-top: 4px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .rp-score-good { background: rgba(77,171,117,0.12); border-left: 3px solid var(--success); }
+    .rp-score-warn { background: rgba(255,183,77,0.12); border-left: 3px solid #ffb74d; }
+    .rp-score-bad  { background: rgba(244,102,102,0.12); border-left: 3px solid var(--danger); }
+    .rp-score-pct { font-weight: 600; }
+    .rp-score-diff { font-family: ui-monospace, Menlo, monospace; font-size: 12px; line-height: 1.6; }
+    .rp-word-miss   { text-decoration: underline wavy #f46666; color: #f46666; }
+    .rp-word-extra  { color: #ffb74d; font-style: italic; }
+    .rp-word-wrong  { color: #f46666; font-style: italic; text-decoration: line-through; }
+    .rp-deep-notes { margin: 6px 0 0 0; padding-left: 18px; font-size: 12px; color: var(--text-dim); }
+    .rp-deep-notes li { margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -662,6 +747,7 @@
       <button id="pmbtn-drill"    class="pmode-btn active" onclick="switchPMode('drill')">Drill</button>
       <button id="pmbtn-annotate" class="pmode-btn"        onclick="switchPMode('annotate')">Annotate</button>
       <button id="pmbtn-generate" class="pmode-btn"        onclick="switchPMode('generate')">Generate</button>
+      <button id="pmbtn-roleplay" class="pmode-btn"        onclick="switchPMode('roleplay')">Role-play</button>
     </div>
 
     <!-- ── Drill mode ── -->
@@ -773,11 +859,12 @@
         <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap">
           <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)" id="pg-results-label">Generated</label>
           <button class="pmode-restart-btn" onclick="generatePassage()">Regenerate ↺</button>
+          <button id="pg-annotate-toggle" class="pmode-restart-btn" onclick="togglePassageAnnotation()" title="Toggle phonetic annotations">📝 Annotate</button>
           <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentGeneratedText, this, 'gcp')"  title="Google Cloud · British RP · ~20k sentences/month free">🔊 Listen</button>
           <button class="practice-btn" style="padding:4px 12px; font-size:12px" onclick="listenSentence(currentGeneratedText, this, 'full')" title="Gemini 3.1 · richer voice · best for passages · 3 per minute">🔊 Full</button>
         </div>
         <div id="pg-annotation" class="annotation-display"></div>
-        <div class="annotation-legend">
+        <div id="pg-annotation-legend" class="annotation-legend" style="display:none">
           <span class="legend-item"><span class="w-weak" style="pointer-events:none">the</span> weak form</span>
           <span class="legend-item"><span class="w-content">speak</span> stressed</span>
           <span class="legend-item"><span class="w-link">⌒</span> catenation</span>
@@ -802,6 +889,24 @@
         </div>
         <div id="pg-save-status" class="status"></div>
         <button id="pg-save-btn" class="practice-btn practice-btn-save" onclick="savePractice('pg')">Save to Notion</button>
+      </div>
+    </div>
+
+    <!-- ── Role-play mode ── -->
+    <div id="pmode-roleplay" class="pmode-section" style="display:none">
+      <div class="field">
+        <label>Pick a scenario</label>
+        <div id="rp-topic-grid" class="rp-topic-grid"></div>
+      </div>
+
+      <div id="rp-stage" style="display:none; flex-direction:column; gap:12px">
+        <div class="rp-role-row">
+          <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Play as</label>
+          <button id="rp-role-a" class="rp-role-btn" onclick="pickRoleplayRole('A')"></button>
+          <button id="rp-role-b" class="rp-role-btn" onclick="pickRoleplayRole('B')"></button>
+          <span id="rp-sr-warning" style="font-size:12px; color:var(--text-dim)"></span>
+        </div>
+        <div id="rp-dialogue" class="rp-dialogue"></div>
       </div>
     </div>
 
@@ -16367,11 +16472,12 @@
 
   // ── Sub-mode switching ─────────────────────────────────────────────────────
   function switchPMode(mode) {
-    ["drill", "annotate", "generate"].forEach(m => {
+    ["drill", "annotate", "generate", "roleplay"].forEach(m => {
       document.getElementById("pmode-" + m).style.display = m === mode ? "flex" : "none";
       document.getElementById("pmbtn-" + m).classList.toggle("active", m === mode);
     });
     if (mode === "drill" && drillDeck.length === 0) initDrill();
+    if (mode === "roleplay" && !roleplayInit) initRoleplay();
   }
 
   // ── DRILL MODE ─────────────────────────────────────────────────────────────
@@ -16550,6 +16656,29 @@
   let currentWeakness      = null;             // single weakness key (sentence mode) — also used by savePractice
   let selectedWeaknesses   = new Set();        // multi-select set for passage mode
   let generateLength       = "sentence";       // "sentence" | "passage"
+  let passageAnnotated     = false;            // toggle state for Generate-mode annotation overlay
+
+  function renderGeneratedPassage() {
+    const host = document.getElementById("pg-annotation");
+    const legend = document.getElementById("pg-annotation-legend");
+    const toggle = document.getElementById("pg-annotate-toggle");
+    if (!host) return;
+    if (passageAnnotated) {
+      annotateInto(currentGeneratedText, "pg-annotation");
+      if (legend) legend.style.display = "flex";
+      if (toggle) toggle.textContent = "📝 Hide";
+    } else {
+      host.textContent = currentGeneratedText;
+      if (legend) legend.style.display = "none";
+      if (toggle) toggle.textContent = "📝 Annotate";
+    }
+  }
+
+  function togglePassageAnnotation() {
+    if (!currentGeneratedText) return;
+    passageAnnotated = !passageAnnotated;
+    renderGeneratedPassage();
+  }
 
   function setGenerateLength(mode) {
     generateLength = mode;
@@ -16613,7 +16742,8 @@
       const { text } = await res.json();
       if (!text) throw new Error("Empty response");
       currentGeneratedText = text;
-      annotateInto(text, "pg-annotation");
+      passageAnnotated = false;
+      renderGeneratedPassage();
       document.getElementById("pg-results").style.display = "flex";
       const audio = document.getElementById("pg-playback");
       audio.src = "";
@@ -16626,7 +16756,8 @@
         if (pool?.length) {
           const fallback = pool[Math.floor(Math.random() * pool.length)];
           currentGeneratedText = fallback;
-          annotateInto(fallback, "pg-annotation");
+          passageAnnotated = false;
+          renderGeneratedPassage();
           document.getElementById("pg-results").style.display = "flex";
           status.textContent = `(offline fallback — ${err.message})`;
           return;
@@ -16931,6 +17062,1072 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     el.textContent = msg;
     el.className = `status ${type}`;
   }
+
+  // ── ROLE-PLAY MODE ─────────────────────────────────────────────────────────
+  // ROLEPLAY_DIALOGUES is defined further below (large static data block).
+  let roleplayInit    = false;
+  let currentTopicId  = null;
+  let currentRole     = null;   // "A" or "B"
+  // Per-line state: key = lineIdx, value = { recorder, chunks, mime, audioBlob }
+  const rpLineRec     = new Map();
+
+  function initRoleplay() {
+    roleplayInit = true;
+    renderRoleplayTopics();
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const warn = document.getElementById("rp-sr-warning");
+    if (!SR && warn) warn.textContent = "(Speech recognition needs Chrome/Edge — 🎙️ disabled)";
+  }
+
+  function renderRoleplayTopics() {
+    const host = document.getElementById("rp-topic-grid");
+    host.innerHTML = "";
+    ROLEPLAY_DIALOGUES.forEach(d => {
+      const btn = document.createElement("button");
+      btn.className = "rp-topic-chip";
+      btn.innerHTML = `<span class="rp-topic-cat">${d.category}</span>${d.title}`;
+      btn.onclick = () => pickRoleplayTopic(d.id);
+      host.appendChild(btn);
+    });
+  }
+
+  function pickRoleplayTopic(id) {
+    currentTopicId = id;
+    rpLineRec.clear();
+    document.querySelectorAll("#rp-topic-grid .rp-topic-chip").forEach((b, i) => {
+      b.classList.toggle("active", ROLEPLAY_DIALOGUES[i].id === id);
+    });
+    const d = ROLEPLAY_DIALOGUES.find(x => x.id === id);
+    if (!d) return;
+    document.getElementById("rp-stage").style.display = "flex";
+    document.getElementById("rp-role-a").textContent = d.a + " (A)";
+    document.getElementById("rp-role-b").textContent = d.b + " (B)";
+    currentRole = "A";
+    document.getElementById("rp-role-a").classList.add("active");
+    document.getElementById("rp-role-b").classList.remove("active");
+    renderRoleplayDialogue();
+  }
+
+  function pickRoleplayRole(role) {
+    currentRole = role;
+    document.getElementById("rp-role-a").classList.toggle("active", role === "A");
+    document.getElementById("rp-role-b").classList.toggle("active", role === "B");
+    renderRoleplayDialogue();
+  }
+
+  function renderRoleplayDialogue() {
+    const d = ROLEPLAY_DIALOGUES.find(x => x.id === currentTopicId);
+    if (!d) return;
+    const host = document.getElementById("rp-dialogue");
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    host.innerHTML = "";
+    d.lines.forEach((line, idx) => {
+      const row = document.createElement("div");
+      row.className = "rp-line";
+      const name = line.speaker === "A" ? d.a : d.b;
+      const mine = line.speaker === currentRole;
+      if (mine) row.classList.add("rp-line-mine");
+      row.dataset.lineIdx = idx;
+
+      const header = document.createElement("div");
+      header.className = "rp-line-header";
+      header.textContent = `${name} (${line.speaker})`;
+      row.appendChild(header);
+
+      const text = document.createElement("div");
+      text.className = "rp-line-text";
+      text.textContent = line.text;
+      row.appendChild(text);
+
+      const btns = document.createElement("div");
+      btns.className = "rp-line-buttons";
+      if (mine) {
+        btns.innerHTML =
+          `<button class="rp-line-btn" onclick="roleplayListen(${idx})" title="Hear model pronunciation (GCP British RP)">🔊 Hear</button>` +
+          (SR ? `<button class="rp-line-btn" onclick="roleplaySpeak(${idx}, this)" title="Read aloud — Web Speech API scores you">🎙️ Speak</button>` : "") +
+          `<button class="rp-line-btn" id="rp-deep-${idx}" onclick="roleplayDeepScore(${idx})" style="display:none" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>`;
+      } else {
+        btns.innerHTML =
+          `<button class="rp-line-btn" onclick="roleplayListen(${idx})" title="Play partner's line">🔊 Play</button>`;
+      }
+      row.appendChild(btns);
+      host.appendChild(row);
+    });
+  }
+
+  function roleplayListen(lineIdx) {
+    const d = ROLEPLAY_DIALOGUES.find(x => x.id === currentTopicId);
+    const line = d.lines[lineIdx];
+    // Reuse existing TTS pipeline via synthetic button (for state/status display on the line button itself)
+    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
+    const btn = row?.querySelector(".rp-line-btn");
+    listenSentence(line.text, btn || event.target, "gcp");
+  }
+
+  async function roleplaySpeak(lineIdx, btn) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const d = ROLEPLAY_DIALOGUES.find(x => x.id === currentTopicId);
+    const target = d.lines[lineIdx].text;
+    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
+    const existing = row.querySelector(".rp-score");
+    if (existing) existing.remove();
+
+    // Start MediaRecorder (for optional Deep Score)
+    let recState = { chunks: [], mime: "audio/webm", blob: null, recorder: null, stream: null };
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const rec = new MediaRecorder(stream);
+      recState.recorder = rec;
+      recState.stream = stream;
+      rec.ondataavailable = (e) => { if (e.data.size > 0) recState.chunks.push(e.data); };
+      rec.onstop = () => {
+        recState.blob = new Blob(recState.chunks, { type: rec.mimeType || "audio/webm" });
+        recState.mime = rec.mimeType || "audio/webm";
+        stream.getTracks().forEach(t => t.stop());
+        const deepBtn = document.getElementById(`rp-deep-${lineIdx}`);
+        if (deepBtn) deepBtn.style.display = "inline-block";
+      };
+      rec.start();
+    } catch (e) {
+      // Mic denied — Web Speech can still work in some browsers via separate prompt
+      recState = null;
+    }
+    rpLineRec.set(lineIdx, recState);
+
+    // Web Speech recognition
+    const r = new SR();
+    r.lang = "en-GB";
+    r.interimResults = false;
+    r.maxAlternatives = 1;
+    btn.textContent = "🎙️ Listening…";
+    btn.disabled = true;
+
+    r.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      roleplayScoreSpeech(lineIdx, target, transcript);
+    };
+    r.onerror = (e) => {
+      paintRpScore(lineIdx, { pct: 0, diff: [], error: e.error || "speech error" });
+    };
+    r.onend = () => {
+      btn.textContent = "🎙️ Speak";
+      btn.disabled = false;
+      const s = rpLineRec.get(lineIdx);
+      if (s && s.recorder && s.recorder.state === "recording") {
+        try { s.recorder.stop(); } catch(_) {}
+      }
+    };
+    try { r.start(); } catch (e) {
+      btn.textContent = "🎙️ Speak";
+      btn.disabled = false;
+    }
+  }
+
+  // Word-level Levenshtein alignment → diff + percentage
+  function scoreLine(target, spoken) {
+    const norm = s => s.toLowerCase().replace(/[\u2019']/g, "'").replace(/[^\w\s']/g, "").split(/\s+/).filter(Boolean);
+    const t = norm(target), s = norm(spoken);
+    const n = t.length, m = s.length;
+    // DP table
+    const dp = Array.from({length: n+1}, () => new Array(m+1).fill(0));
+    for (let i = 0; i <= n; i++) dp[i][0] = i;
+    for (let j = 0; j <= m; j++) dp[0][j] = j;
+    for (let i = 1; i <= n; i++) {
+      for (let j = 1; j <= m; j++) {
+        const cost = t[i-1] === s[j-1] ? 0 : 1;
+        dp[i][j] = Math.min(dp[i-1][j] + 1, dp[i][j-1] + 1, dp[i-1][j-1] + cost);
+      }
+    }
+    // Traceback for per-token ops
+    const diff = [];
+    let i = n, j = m;
+    while (i > 0 || j > 0) {
+      if (i > 0 && j > 0 && dp[i][j] === dp[i-1][j-1] + (t[i-1] === s[j-1] ? 0 : 1)) {
+        diff.unshift({ word: t[i-1], status: t[i-1] === s[j-1] ? "ok" : "wrong", heard: s[j-1] });
+        i--; j--;
+      } else if (i > 0 && dp[i][j] === dp[i-1][j] + 1) {
+        diff.unshift({ word: t[i-1], status: "miss" });
+        i--;
+      } else {
+        diff.unshift({ word: s[j-1], status: "extra" });
+        j--;
+      }
+    }
+    const edits = dp[n][m];
+    const pct = Math.max(0, Math.round(100 * (1 - edits / Math.max(n, m, 1))));
+    return { pct, diff, heard: spoken };
+  }
+
+  function roleplayScoreSpeech(lineIdx, target, transcript) {
+    const result = scoreLine(target, transcript);
+    paintRpScore(lineIdx, result);
+  }
+
+  function paintRpScore(lineIdx, result) {
+    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
+    if (!row) return;
+    row.querySelectorAll(".rp-score").forEach(e => e.remove());
+    const div = document.createElement("div");
+    div.className = "rp-score " + (result.error ? "rp-score-bad" :
+                                   result.pct >= 85 ? "rp-score-good" :
+                                   result.pct >= 60 ? "rp-score-warn" : "rp-score-bad");
+    if (result.error) {
+      div.innerHTML = `<span class="rp-score-pct">Error: ${result.error}</span>`;
+    } else {
+      const diffHtml = result.diff.map(d => {
+        if (d.status === "ok")    return `<span>${escapeHtml(d.word)}</span>`;
+        if (d.status === "miss")  return `<span class="rp-word-miss">${escapeHtml(d.word)}</span>`;
+        if (d.status === "extra") return `<span class="rp-word-extra">(${escapeHtml(d.word)})</span>`;
+        if (d.status === "wrong") return `<span class="rp-word-wrong">${escapeHtml(d.word)}→${escapeHtml(d.heard)}</span>`;
+        return "";
+      }).join(" ");
+      div.innerHTML = `<div><span class="rp-score-pct">${result.pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">heard: ${escapeHtml(result.heard || "")}</span></div><div class="rp-score-diff">${diffHtml}</div>`;
+    }
+    row.appendChild(div);
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+
+  async function roleplayDeepScore(lineIdx) {
+    const d = ROLEPLAY_DIALOGUES.find(x => x.id === currentTopicId);
+    const target = d.lines[lineIdx].text;
+    const rec = rpLineRec.get(lineIdx);
+    if (!rec || !rec.blob) { alert("No recording captured — try 🎙️ Speak again."); return; }
+    const deepBtn = document.getElementById(`rp-deep-${lineIdx}`);
+    if (deepBtn) { deepBtn.disabled = true; deepBtn.textContent = "🤖 Scoring…"; }
+    try {
+      const arrayBuf = await rec.blob.arrayBuffer();
+      const base64 = arrayBufferToBase64(arrayBuf);
+      const res = await fetch(`${WORKER_URL}/score-line`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target, audioBase64: base64, mime: rec.mime }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(e.error || `Score error ${res.status}`);
+      }
+      const { pct, notes } = await res.json();
+      paintDeepScore(lineIdx, pct, notes);
+    } catch (err) {
+      alert("Deep score failed: " + err.message);
+    } finally {
+      if (deepBtn) { deepBtn.disabled = false; deepBtn.textContent = "🤖 Deep score"; }
+    }
+  }
+
+  function paintDeepScore(lineIdx, pct, notes) {
+    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
+    if (!row) return;
+    row.querySelectorAll(".rp-deep-block").forEach(e => e.remove());
+    const div = document.createElement("div");
+    const cls = pct >= 85 ? "rp-score-good" : pct >= 60 ? "rp-score-warn" : "rp-score-bad";
+    div.className = `rp-score rp-deep-block ${cls}`;
+    const notesHtml = (notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("");
+    div.innerHTML = `<div><span class="rp-score-pct">🤖 ${pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">Gemini 2.5</span></div>${notesHtml ? `<ul class="rp-deep-notes">${notesHtml}</ul>` : ""}`;
+    row.appendChild(div);
+  }
+
+  function arrayBufferToBase64(buf) {
+    const bytes = new Uint8Array(buf);
+    let bin = "";
+    const chunk = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunk) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+    }
+    return btoa(bin);
+  }
+
+  // ── ROLE-PLAY DIALOGUES (static data) ─────────────────────────────────────
+  const ROLEPLAY_DIALOGUES = [
+    {
+      id: "office-prep", title: "Preparing for a meeting", category: "Office", a: "Alex", b: "Sam",
+      lines: [
+        { speaker: "A", text: "Right, have you had a chance to look over the deck?" },
+        { speaker: "B", text: "Yeah, ran through it this morning. Slide seven's a bit dense." },
+        { speaker: "A", text: "Dense how? Too much text, or the chart?" },
+        { speaker: "B", text: "Both really. The chart needs a proper title at least." },
+        { speaker: "A", text: "Fair point. I'll tidy it up before we go in." },
+        { speaker: "B", text: "And do we actually have the latest numbers from finance?" },
+        { speaker: "A", text: "Pretty much. Rachel sent them over last night." },
+        { speaker: "B", text: "Brilliant. Did she flag anything we should be careful of?" },
+        { speaker: "A", text: "Just that Q1 revenue is provisional. Don't quote it as final." },
+        { speaker: "B", text: "Got it. I'll soften the wording on slide four." },
+        { speaker: "A", text: "Who's actually going to be in the room, do we know?" },
+        { speaker: "B", text: "The usual lot, plus a couple from the client side." },
+        { speaker: "A", text: "Anyone senior from their end? Might change the pitch." },
+        { speaker: "B", text: "Their head of operations, apparently. Bit of a stickler for detail." },
+        { speaker: "A", text: "Then we should lead with the risk slide, not the benefits." },
+        { speaker: "B", text: "Agreed. Let's flip the order around a bit." },
+        { speaker: "A", text: "I'll take the first half. You alright to cover timelines?" },
+        { speaker: "B", text: "Yeah, no worries. I'll keep it short." },
+        { speaker: "A", text: "Questions at the end or interruptions throughout?" },
+        { speaker: "B", text: "Let them interrupt. Feels more like a conversation." },
+        { speaker: "A", text: "True. But if someone goes off on a tangent, rein it in gently." },
+        { speaker: "B", text: "I'll do my best. You know what Martin's like." },
+        { speaker: "A", text: "Oh god, don't remind me. He loves the sound of his own voice." },
+        { speaker: "B", text: "Twenty minutes on scope creep last time. Twenty minutes." },
+        { speaker: "A", text: "Painful. Right, what about the appendix slides?" },
+        { speaker: "B", text: "Keep them in but don't show them unless asked." },
+        { speaker: "A", text: "Good call. Less is more, basically." },
+        { speaker: "B", text: "Exactly. Have you tested the projector in that meeting room?" },
+        { speaker: "A", text: "Not yet. I'll pop in at half eight and sort it." },
+        { speaker: "B", text: "Bring a backup cable. The HDMI one went walkabout last week." },
+        { speaker: "A", text: "Seriously? Who on earth takes an HDMI cable?" },
+        { speaker: "B", text: "Someone with a very specific hobby, clearly." },
+        { speaker: "A", text: "Right. Laptop, cable, deck, notes. Anything else?" },
+        { speaker: "B", text: "Water. Bring a jug and glasses. Makes it feel more official." },
+        { speaker: "A", text: "Ha, noted. And biscuits?" },
+        { speaker: "B", text: "Always biscuits. Never skip the biscuits." },
+        { speaker: "A", text: "Custard creams or bourbons, do we reckon?" },
+        { speaker: "B", text: "Mix, just to be safe. Keep everyone happy." },
+        { speaker: "A", text: "Are we printing handouts or going fully digital?" },
+        { speaker: "B", text: "Digital. But I'll email the PDF twenty minutes before we start." },
+        { speaker: "A", text: "Sensible. That way they can follow along or zone out." },
+        { speaker: "B", text: "Most will zone out regardless. It's just how it goes." },
+        { speaker: "A", text: "How long are we giving the whole thing, end to end?" },
+        { speaker: "B", text: "Forty minutes talk, twenty for questions. Hard stop at the hour." },
+        { speaker: "A", text: "Ambitious. We always overrun." },
+        { speaker: "B", text: "Not this time. I'll flag the time at the halfway point." },
+        { speaker: "A", text: "Good. Who's taking the notes afterwards?" },
+        { speaker: "B", text: "I'll do it. Send a summary by end of play tomorrow." },
+        { speaker: "A", text: "Include action owners and dates, please. Keeps it honest." },
+        { speaker: "B", text: "Will do. Anything you want emphasised in the follow-up?" },
+        { speaker: "A", text: "Just the decision points. Nobody reads the rest anyway." },
+        { speaker: "B", text: "Fair. Right, I think we're about as ready as we can be." },
+        { speaker: "A", text: "Agreed. Shall we grab a coffee before it kicks off?" },
+        { speaker: "B", text: "Good plan. I could do with one, to be honest." },
+        { speaker: "A", text: "Cafeteria or the little place round the corner?" },
+        { speaker: "B", text: "Round the corner. Their flat whites are miles better." },
+        { speaker: "A", text: "Agreed. And they do those almond croissants." },
+        { speaker: "B", text: "Sold. Come on, we've got about twenty minutes." },
+        { speaker: "A", text: "Perfect. Let's not be late back though. First impressions and all that." },
+        { speaker: "B", text: "Never. I'll set a timer on my phone. Right, let's go." },
+      ],
+    },
+    {
+      id: "coaching", title: "Coaching", category: "Office", a: "Tom", b: "Lucy",
+      lines: [
+        { speaker: "A", text: "Thanks for making time today. How have you been getting on?" },
+        { speaker: "B", text: "Not too bad. Bit stretched, to be honest." },
+        { speaker: "A", text: "Stretched in what sense? Workload, or something else?" },
+        { speaker: "B", text: "Mainly workload. Three projects live at once is a lot." },
+        { speaker: "A", text: "Yeah, I can see that. Which one's taking the most time?" },
+        { speaker: "B", text: "The migration. It keeps throwing up surprises." },
+        { speaker: "A", text: "What kind of surprises are we talking about?" },
+        { speaker: "B", text: "Legacy data mostly. Half the records don't match the schema." },
+        { speaker: "A", text: "Ouch. Have you looped in anyone from the data team?" },
+        { speaker: "B", text: "Not yet. I didn't want to add to their plate." },
+        { speaker: "A", text: "Honestly, they'd rather know early than firefight at the end." },
+        { speaker: "B", text: "Fair. I'll drop them a message this afternoon." },
+        { speaker: "A", text: "Good. What else is weighing on you?" },
+        { speaker: "B", text: "I don't feel I'm growing. Just grinding through tickets." },
+        { speaker: "A", text: "That's useful to hear. What would growth look like for you?" },
+        { speaker: "B", text: "I'd like to own something end to end, rather than bits and pieces." },
+        { speaker: "A", text: "Okay. Is there a piece of work coming up that could fit?" },
+        { speaker: "B", text: "The reporting dashboard, possibly. Nobody's stepped up yet." },
+        { speaker: "A", text: "Would you actually want that, or just tolerate it?" },
+        { speaker: "B", text: "I'd want it. It's visible, and I'd learn loads." },
+        { speaker: "A", text: "Then let's make it happen. What's the biggest blocker?" },
+        { speaker: "B", text: "Honestly? Confidence. I've not led a piece like that before." },
+        { speaker: "A", text: "You've co-led before. This is just a bit more of the same." },
+        { speaker: "B", text: "I suppose. It still feels like a step up though." },
+        { speaker: "A", text: "Good. Steps up are where the learning actually happens." },
+        { speaker: "B", text: "What if I get stuck and can't see a way through?" },
+        { speaker: "A", text: "You ask. Early, clearly, and without apologising for it." },
+        { speaker: "B", text: "Noted. I'm quite bad at that, to be fair." },
+        { speaker: "A", text: "I've noticed. Why do you think that is?" },
+        { speaker: "B", text: "I worry people will think I can't handle it." },
+        { speaker: "A", text: "In my experience, the opposite tends to be true." },
+        { speaker: "B", text: "Really? How so?" },
+        { speaker: "A", text: "Asking well is a skill. It shows you're thinking, not floundering." },
+        { speaker: "B", text: "That reframes it a bit. I'll try to lean into it more." },
+        { speaker: "A", text: "Let's set a tiny experiment. One help-request a week, minimum." },
+        { speaker: "B", text: "Alright. I can do that. Tracked how?" },
+        { speaker: "A", text: "Just tell me at our next one-to-one. Nothing formal." },
+        { speaker: "B", text: "Easy enough. What about presentation skills?" },
+        { speaker: "A", text: "What about them? What's on your mind?" },
+        { speaker: "B", text: "I freeze up when senior people are in the room." },
+        { speaker: "A", text: "Very common. What happens in your head in that moment?" },
+        { speaker: "B", text: "I start second-guessing every word before I say it." },
+        { speaker: "A", text: "Try preparing one strong opening sentence. Just one." },
+        { speaker: "B", text: "Just the opening?" },
+        { speaker: "A", text: "Yes. If you start well, the rest tends to flow." },
+        { speaker: "B", text: "That's practical. I'll try it on Thursday's update." },
+        { speaker: "A", text: "Perfect. I'll be there. Give me honest feedback afterwards." },
+        { speaker: "B", text: "Deal. Can I ask about progression?" },
+        { speaker: "A", text: "Of course. What do you want to know?" },
+        { speaker: "B", text: "Realistically, when might I be ready for the next level?" },
+        { speaker: "A", text: "Twelve months, if you own a piece like the dashboard well." },
+        { speaker: "B", text: "That's quicker than I expected, actually." },
+        { speaker: "A", text: "You're closer than you think. You just need the evidence." },
+        { speaker: "B", text: "Okay. That gives me something concrete to aim at." },
+        { speaker: "A", text: "Good. Anything else on your mind before we wrap?" },
+        { speaker: "B", text: "No, I think that's it. Thanks for the push." },
+        { speaker: "A", text: "Any time. Let's catch up properly in a fortnight." },
+        { speaker: "B", text: "Sounds good. I'll come with concrete updates." },
+        { speaker: "A", text: "Brilliant. Go get started on the dashboard scoping today." },
+        { speaker: "B", text: "Will do. Appreciate it, honestly. Cheers." },
+      ],
+    },
+    {
+      id: "planning", title: "Planning meeting", category: "Office", a: "Sam", b: "Emma",
+      lines: [
+        { speaker: "A", text: "Right, Q2 planning. Where do we even start?" },
+        { speaker: "B", text: "With the must-haves, I'd say. The rest is negotiable." },
+        { speaker: "A", text: "Fair. Top of the list is the compliance release." },
+        { speaker: "B", text: "Agreed. Hard deadline end of May, no wriggle room." },
+        { speaker: "A", text: "What's the realistic effort on that one?" },
+        { speaker: "B", text: "Two engineers for six weeks. Maybe seven if testing drags." },
+        { speaker: "A", text: "That eats a good chunk of the quarter already." },
+        { speaker: "B", text: "It does. Which is why we need to cut something else." },
+        { speaker: "A", text: "What's the weakest candidate on the list?" },
+        { speaker: "B", text: "The notifications refactor. Nice to have, no real urgency." },
+        { speaker: "A", text: "Can we push it to Q3 without upsetting anyone?" },
+        { speaker: "B", text: "Probably. Let me check with Priya before we commit." },
+        { speaker: "A", text: "Good. What about the onboarding revamp?" },
+        { speaker: "B", text: "That one's commercial. Marketing want it live before June." },
+        { speaker: "A", text: "June? That's tighter than I thought." },
+        { speaker: "B", text: "Launch campaign's already booked, apparently." },
+        { speaker: "A", text: "Nobody told us that, did they? Classic." },
+        { speaker: "B", text: "Welcome to planning. It's half archaeology." },
+        { speaker: "A", text: "Alright. Two parallel tracks, then. Compliance and onboarding." },
+        { speaker: "B", text: "We'll need a third person. We can't stretch two across both." },
+        { speaker: "A", text: "Can we borrow someone from platform for six weeks?" },
+        { speaker: "B", text: "Maybe. They owe us from last quarter." },
+        { speaker: "A", text: "I'll ask Dan. He's usually reasonable if you ask nicely." },
+        { speaker: "B", text: "Good. What's the risk register looking like?" },
+        { speaker: "A", text: "Biggest risk is the auth dependency. Third-party vendor." },
+        { speaker: "B", text: "Are they actually on track? We heard different last week." },
+        { speaker: "A", text: "Their PM said yes. Their engineer said maybe." },
+        { speaker: "B", text: "That's the tell, isn't it? Always trust the engineer." },
+        { speaker: "A", text: "I'll add a fortnight of contingency and hope for the best." },
+        { speaker: "B", text: "Hope for the best, plan for the worst. Right." },
+        { speaker: "A", text: "What about bug budget? We keep forgetting this." },
+        { speaker: "B", text: "Ten percent of capacity, minimum. Otherwise we regret it." },
+        { speaker: "A", text: "Ten percent feels generous. Can we do five?" },
+        { speaker: "B", text: "History says no. Five is what we aim for, ten is what we use." },
+        { speaker: "A", text: "Alright, ten it is. How about tech debt?" },
+        { speaker: "B", text: "One ticket per sprint, per person. Keeps it moving." },
+        { speaker: "A", text: "That's sensible. Nothing too heroic." },
+        { speaker: "B", text: "Exactly. Small, consistent, boring. Boring is good." },
+        { speaker: "A", text: "Speaking of boring, documentation. Are we actually going to do any?" },
+        { speaker: "B", text: "If we tie it to definition of done, yes. Otherwise, no." },
+        { speaker: "A", text: "Tie it to definition of done. Let's just bite the bullet." },
+        { speaker: "B", text: "Agreed. I'll update the template before kickoff." },
+        { speaker: "A", text: "What's the communication cadence looking like?" },
+        { speaker: "B", text: "Weekly written update, fortnightly demo, monthly deep dive." },
+        { speaker: "A", text: "Three touchpoints feels like a lot. Is the deep dive needed?" },
+        { speaker: "B", text: "Leadership wants it. We pick our battles." },
+        { speaker: "A", text: "Fair enough. I'll host the demos if you take the updates." },
+        { speaker: "B", text: "Deal. Anything else before we open it up to the team?" },
+        { speaker: "A", text: "Holiday cover. We've got three people off in April." },
+        { speaker: "B", text: "Three? That's going to hurt. Who exactly?" },
+        { speaker: "A", text: "Jamie, Priya, and me for a week. All already booked." },
+        { speaker: "B", text: "Alright. Let's plan the cover now, not later." },
+        { speaker: "A", text: "Pair everyone up. No single points of failure." },
+        { speaker: "B", text: "That's always the goal, isn't it. Never actually happens." },
+        { speaker: "A", text: "This time we mean it. Put it on the definition of done too." },
+        { speaker: "B", text: "Right. Shall we bring the team in and share the draft?" },
+        { speaker: "A", text: "Give me five minutes. I want to tidy the slide first." },
+        { speaker: "B", text: "Take ten. I'll grab another coffee." },
+        { speaker: "A", text: "Good shout. Same order as before?" },
+        { speaker: "B", text: "Yep. And a biscuit. Blood sugar is everything." },
+        { speaker: "A", text: "Completely agree. Be back in a bit. Thanks, Emma." },
+      ],
+    },
+    {
+      id: "ai-adopt", title: "AI adoption", category: "Office", a: "Ben", b: "Chloe",
+      lines: [
+        { speaker: "A", text: "So, have you actually tried the new AI tools yet?" },
+        { speaker: "B", text: "A bit. The coding assistant, mostly. It's genuinely useful." },
+        { speaker: "A", text: "How useful, though? Hype or real?" },
+        { speaker: "B", text: "Real, for boilerplate. Less useful for the tricky stuff." },
+        { speaker: "A", text: "That matches what I've heard. Saves time on the obvious bits." },
+        { speaker: "B", text: "Exactly. Like writing tests, or refactoring a small function." },
+        { speaker: "A", text: "Do you trust the output, or do you double-check everything?" },
+        { speaker: "B", text: "Double-check. Always. It's confidently wrong sometimes." },
+        { speaker: "A", text: "That's my worry. People stop reading carefully." },
+        { speaker: "B", text: "Yeah, complacency is the real risk, not the tool itself." },
+        { speaker: "A", text: "How's the wider team taking to it?" },
+        { speaker: "B", text: "Split. Half are curious, half are waiting to see." },
+        { speaker: "A", text: "What about the sceptics? What's their main concern?" },
+        { speaker: "B", text: "Jobs, mostly. And whether it erodes their craft." },
+        { speaker: "A", text: "Both are fair concerns, honestly." },
+        { speaker: "B", text: "They are. But burying your head doesn't help either." },
+        { speaker: "A", text: "Should we run a proper session on it? Internal talk?" },
+        { speaker: "B", text: "Good idea. Hands-on, not just slides." },
+        { speaker: "A", text: "Agreed. Bring a laptop, solve a real ticket together." },
+        { speaker: "B", text: "That'd land much better than a theory lecture." },
+        { speaker: "A", text: "Who should run it? You've got the most experience." },
+        { speaker: "B", text: "I'd rather co-run it. Makes it feel less preachy." },
+        { speaker: "A", text: "Fair. I'll help. We can do a demo each." },
+        { speaker: "B", text: "Perfect. Pick a good ticket, not a trivial one." },
+        { speaker: "A", text: "Something with ambiguous requirements. That's where it's weakest." },
+        { speaker: "B", text: "Exactly. Shows the limits and the strengths in one go." },
+        { speaker: "A", text: "What about governance? Is anyone thinking about that?" },
+        { speaker: "B", text: "Legal are. There's a draft policy floating about." },
+        { speaker: "A", text: "Have you actually read it?" },
+        { speaker: "B", text: "Skimmed it. Mostly sensible. No customer data into prompts." },
+        { speaker: "A", text: "Obvious in hindsight, but worth spelling out." },
+        { speaker: "B", text: "People do paste things in without thinking. It's human." },
+        { speaker: "A", text: "Do we have a sanctioned list of tools yet?" },
+        { speaker: "B", text: "Three approved vendors. The rest need a review first." },
+        { speaker: "A", text: "Three's enough. Don't want a hundred half-used licences." },
+        { speaker: "B", text: "Agreed. Procurement's a nightmare as it is." },
+        { speaker: "A", text: "What about cost? These tools aren't cheap at scale." },
+        { speaker: "B", text: "Budget's tight. We'll have to justify every seat." },
+        { speaker: "A", text: "Fair. Usage metrics would help that conversation." },
+        { speaker: "B", text: "Most tools report usage natively now. Handy." },
+        { speaker: "A", text: "Any interesting use cases outside engineering?" },
+        { speaker: "B", text: "Customer support are trialling summarisation. Big time-saver." },
+        { speaker: "A", text: "Summaries of support tickets?" },
+        { speaker: "B", text: "Of long conversations. Agents read a paragraph, not pages." },
+        { speaker: "A", text: "That's brilliant, actually. What about marketing?" },
+        { speaker: "B", text: "Drafts and editing. They were sceptical, now they're hooked." },
+        { speaker: "A", text: "Is there anything you've tried that genuinely flopped?" },
+        { speaker: "B", text: "Meeting summarisers. Too much noise, misses the nuance." },
+        { speaker: "A", text: "Ha, I had the same. It flagged my jokes as action items." },
+        { speaker: "B", text: "Classic. You end up editing the summary yourself anyway." },
+        { speaker: "A", text: "Where do you think it genuinely changes the role long term?" },
+        { speaker: "B", text: "Less grunt work. More time on design and review." },
+        { speaker: "A", text: "That's the optimistic view. The pessimistic one?" },
+        { speaker: "B", text: "Pressure to ship faster with fewer people." },
+        { speaker: "A", text: "Both can be true at once, can't they?" },
+        { speaker: "B", text: "They usually are. That's why adoption isn't just technical." },
+        { speaker: "A", text: "So, session next month? Shall we pencil a date?" },
+        { speaker: "B", text: "Yes. Second Thursday, after stand-up. Keep it to forty-five minutes." },
+        { speaker: "A", text: "Deal. I'll book a room. You pick the ticket." },
+        { speaker: "B", text: "Perfect. Let's make it actually useful, not just trendy." },
+        { speaker: "A", text: "Couldn't agree more. Alright, lunch? I'm starving." },
+      ],
+    },
+    {
+      id: "traitors", title: "The Traitors", category: "Small talk", a: "Jack", b: "Emma",
+      lines: [
+        { speaker: "A", text: "Did you catch last night's Traitors?" },
+        { speaker: "B", text: "Course I did. I can't believe they banished him." },
+        { speaker: "A", text: "I know. He was clearly a faithful. Total misread." },
+        { speaker: "B", text: "The way he tried to defend himself though. Painful." },
+        { speaker: "A", text: "He went too hard too early. Made himself look guilty." },
+        { speaker: "B", text: "Exactly. Calm people always survive longer on that show." },
+        { speaker: "A", text: "Who do you reckon is the lead traitor now?" },
+        { speaker: "B", text: "Has to be her, doesn't it? The quiet one at the breakfast table." },
+        { speaker: "A", text: "You think? I had her down as a faithful, actually." },
+        { speaker: "B", text: "Watch her eyes during the round table. She never quite commits." },
+        { speaker: "A", text: "Hmm, good spot. I'll rewatch that scene tonight." },
+        { speaker: "B", text: "The missions were decent this week too. That rope challenge." },
+        { speaker: "A", text: "Brutal. Ten thousand added to the prize pot, mind." },
+        { speaker: "B", text: "Worth it. Though half of them didn't pull their weight." },
+        { speaker: "A", text: "Always a few who just hang back. Easy money for them." },
+        { speaker: "B", text: "Claudia looked furious when they finished early." },
+        { speaker: "A", text: "Her outfits this series have been unreal." },
+        { speaker: "B", text: "That purple cape? Iconic. I want one." },
+        { speaker: "A", text: "I'd wear that down Tesco. Proper Bond villain energy." },
+        { speaker: "B", text: "Imagine doing your big shop dressed like a traitor." },
+        { speaker: "A", text: "Would absolutely work. Moves the scan-and-go queue along." },
+        { speaker: "B", text: "Who do you want to win, if any of them?" },
+        { speaker: "A", text: "The teacher, without a doubt. She deserves it." },
+        { speaker: "B", text: "Yeah, she's smart. Hasn't said anything daft yet." },
+        { speaker: "A", text: "That's the trick. Say enough to look involved, not enough to stand out." },
+        { speaker: "B", text: "It's basically a masterclass in not getting noticed." },
+        { speaker: "A", text: "Which is a weird skill to develop, when you think about it." },
+        { speaker: "B", text: "Shall we talk about the shield bit, though?" },
+        { speaker: "A", text: "Oh God, yes. That was so tense." },
+        { speaker: "B", text: "The way he hid it under the bench. Sneaky as anything." },
+        { speaker: "A", text: "And he nearly got murdered anyway. Ironic." },
+        { speaker: "B", text: "The traitors always go after the shield holder. Doesn't add up strategically." },
+        { speaker: "A", text: "Unless they want to burn the shield before it reappears next round." },
+        { speaker: "B", text: "Fair point. You've clearly thought about this way too much." },
+        { speaker: "A", text: "Every Tuesday night, basically my only hobby." },
+        { speaker: "B", text: "Do you watch live or wait and binge?" },
+        { speaker: "A", text: "Live. I can't handle the spoilers otherwise." },
+        { speaker: "B", text: "Same. My group chat goes mental during the round table." },
+        { speaker: "A", text: "Ours too. Thirty messages a minute, easily." },
+        { speaker: "B", text: "Who's the loudest in yours?" },
+        { speaker: "A", text: "My mate Dan. He accuses everyone, then flips halfway through." },
+        { speaker: "B", text: "Sounds like a traitor himself, frankly." },
+        { speaker: "A", text: "Honestly, I'd put money on it. Shifty type." },
+        { speaker: "B", text: "Apparently there's a celebrity version coming next year." },
+        { speaker: "A", text: "I saw that. Mixed feelings about it." },
+        { speaker: "B", text: "Same. Civilians are way more watchable." },
+        { speaker: "A", text: "Celebs will just protect each other. Loses the spark." },
+        { speaker: "B", text: "Unless they properly commit to the bit, which I doubt." },
+        { speaker: "A", text: "Exactly. Give me a nervous plumber from Hull any day." },
+        { speaker: "B", text: "Hull has provided some top contestants, mind you." },
+        { speaker: "A", text: "Underrated city. Proper good reality TV talent pool." },
+        { speaker: "B", text: "Right, what's your prediction for next week then?" },
+        { speaker: "A", text: "Another murder, obviously. Banishment will be close." },
+        { speaker: "B", text: "I think they'll turn on the quiet one. Finally." },
+        { speaker: "A", text: "Too soon. She'll survive at least one more round." },
+        { speaker: "B", text: "Tenner says otherwise." },
+        { speaker: "A", text: "You're on. Proper tenner, not a pretend one." },
+        { speaker: "B", text: "Cash on Wednesday morning. No backing out." },
+        { speaker: "A", text: "Deal. Right, I've got to go. Same time next week?" },
+        { speaker: "B", text: "Always. Have a good one. Don't get banished." },
+      ],
+    },
+    {
+      id: "peaky", title: "Peaky Blinders", category: "Small talk", a: "Tom", b: "Sam",
+      lines: [
+        { speaker: "A", text: "Have you finally got round to finishing Peaky Blinders?" },
+        { speaker: "B", text: "Yeah, last weekend. Series six was a lot." },
+        { speaker: "A", text: "It was, wasn't it? Bit darker than the earlier ones." },
+        { speaker: "B", text: "Tommy's basically unrecognisable by the end." },
+        { speaker: "A", text: "Fair. He's been through hell by then." },
+        { speaker: "B", text: "That scene with the horse, mate. Proper got me." },
+        { speaker: "A", text: "I know. I wasn't expecting to feel that much about a horse." },
+        { speaker: "B", text: "Cillian Murphy is just brilliant though. No one else could play him." },
+        { speaker: "A", text: "He does more with silence than most actors do with a speech." },
+        { speaker: "B", text: "Exactly. Just a look, and the whole room goes cold." },
+        { speaker: "A", text: "What did you make of Arthur's arc?" },
+        { speaker: "B", text: "Tragic. Paul Anderson was incredible." },
+        { speaker: "A", text: "He deserved more awards, honestly. Criminally underrated." },
+        { speaker: "B", text: "The family dynamic is what makes the whole show, really." },
+        { speaker: "A", text: "Polly especially. Her loss really hit the later series." },
+        { speaker: "B", text: "Helen McCrory was the heart of it. You could tell they all missed her." },
+        { speaker: "A", text: "The writing tried to honour her. You could feel that." },
+        { speaker: "B", text: "Yeah, they didn't rush past it. Respectful, properly done." },
+        { speaker: "A", text: "Do you reckon the film will actually happen?" },
+        { speaker: "B", text: "Supposedly filming now. I'll believe it when I see it." },
+        { speaker: "A", text: "I'm wary. Spin-offs often don't land." },
+        { speaker: "B", text: "Same. But if Knight writes it, I'll watch anything." },
+        { speaker: "A", text: "That soundtrack though. Nick Cave on repeat." },
+        { speaker: "B", text: "Red Right Hand is one of those songs that is the show." },
+        { speaker: "A", text: "PJ Harvey, Radiohead. Proper curated stuff." },
+        { speaker: "B", text: "It's a whole mood before you even hear dialogue." },
+        { speaker: "A", text: "The cinematography isn't half bad either." },
+        { speaker: "B", text: "Birmingham never looked so glamorous. Or so grim." },
+        { speaker: "A", text: "My mate from Brum says they overdo the accent." },
+        { speaker: "B", text: "Oh, a hundred percent. It drifts all over the place." },
+        { speaker: "A", text: "Cillian even admitted it. Called it a version of Brummie." },
+        { speaker: "B", text: "At least he's honest. Some actors would defend it to the death." },
+        { speaker: "A", text: "Who's your favourite minor character?" },
+        { speaker: "B", text: "Alfie Solomons. Every scene Tom Hardy's in is chaos." },
+        { speaker: "A", text: "He just mumbles and somehow dominates the whole scene." },
+        { speaker: "B", text: "That baker scene with the bread knife? Genuinely unhinged." },
+        { speaker: "A", text: "I rewound it three times. Couldn't even catch half the lines." },
+        { speaker: "B", text: "Mumble-core cinema at its finest." },
+        { speaker: "A", text: "What about Michael? Was his ending satisfying?" },
+        { speaker: "B", text: "Sort of. It had been building for series." },
+        { speaker: "A", text: "I wanted one more proper confrontation though." },
+        { speaker: "B", text: "Same. Felt a bit rushed in the end, to be fair." },
+        { speaker: "A", text: "Are you going to rewatch from the start?" },
+        { speaker: "B", text: "Already started series one. Holds up brilliantly." },
+        { speaker: "A", text: "It does. That first episode, Tommy on the horse through the streets." },
+        { speaker: "B", text: "Iconic opening. Sets the tone in under a minute." },
+        { speaker: "A", text: "Some shows need three series to find their feet. Not this one." },
+        { speaker: "B", text: "They knew exactly what they were doing from minute one." },
+        { speaker: "A", text: "Would you have watched if it wasn't on BBC iPlayer?" },
+        { speaker: "B", text: "Probably not, honestly. iPlayer is a gem, quietly." },
+        { speaker: "A", text: "Proper underrated streaming service, when you think about it." },
+        { speaker: "B", text: "No adverts, actually watchable. A small miracle." },
+        { speaker: "A", text: "Right, what are you watching next?" },
+        { speaker: "B", text: "Something lighter. I need a break from bleak." },
+        { speaker: "A", text: "Try Ghosts. It's proper comfort telly." },
+        { speaker: "B", text: "I've heard good things. Is it actually funny?" },
+        { speaker: "A", text: "Genuinely funny. And short episodes, which is a bonus." },
+        { speaker: "B", text: "Sold. Peaky's a hard act to follow, but Ghosts sounds ideal." },
+        { speaker: "A", text: "Give it a go. Let me know what you think next week." },
+        { speaker: "B", text: "Will do. Right, I need to crack on. See you Thursday." },
+      ],
+    },
+    {
+      id: "football", title: "Football", category: "Small talk", a: "Dan", b: "Jamie",
+      lines: [
+        { speaker: "A", text: "Did you watch the game at the weekend?" },
+        { speaker: "B", text: "Course I did. Painful, wasn't it?" },
+        { speaker: "A", text: "That penalty in the ninetieth minute. Come on." },
+        { speaker: "B", text: "Soft. Absolutely soft. VAR should've chalked it off." },
+        { speaker: "A", text: "VAR's been rubbish this season, full stop." },
+        { speaker: "B", text: "The lines aren't even straight half the time." },
+        { speaker: "A", text: "And the time it takes. The game just stops dead." },
+        { speaker: "B", text: "Four minutes for a toenail offside. It's madness." },
+        { speaker: "A", text: "What did you make of the new lad up front?" },
+        { speaker: "B", text: "Looks the part. Quick, a bit of a finish. Early days though." },
+        { speaker: "A", text: "He missed a sitter in the first half, mind." },
+        { speaker: "B", text: "Yeah but he got himself in the right position. That's the key." },
+        { speaker: "A", text: "Fair. Goals will come if he keeps making those runs." },
+        { speaker: "B", text: "The midfield though. Non-existent." },
+        { speaker: "A", text: "Completely overrun in the second half." },
+        { speaker: "B", text: "The manager has to change it. We can't carry on like this." },
+        { speaker: "A", text: "Do you think he's on his way out?" },
+        { speaker: "B", text: "End of the season, for sure. If he survives that long." },
+        { speaker: "A", text: "Who's lined up to replace him? Any rumours?" },
+        { speaker: "B", text: "Two or three names. Nothing solid." },
+        { speaker: "A", text: "I wouldn't mind the German bloke. He's got a plan, at least." },
+        { speaker: "B", text: "Too expensive. And his press would wreck our injury record." },
+        { speaker: "A", text: "We've already got half the squad in the treatment room." },
+        { speaker: "B", text: "Shambles. The centre back's been out since October." },
+        { speaker: "A", text: "The physios need a physio at this point." },
+        { speaker: "B", text: "Ha, true. What about the transfer window then?" },
+        { speaker: "A", text: "Quiet so far. One loan and a free." },
+        { speaker: "B", text: "Not exactly the statement we needed." },
+        { speaker: "A", text: "The owners don't want to spend. Same old story." },
+        { speaker: "B", text: "Champion of penny-pinching, that lot." },
+        { speaker: "A", text: "What about the youth team? Anyone coming through?" },
+        { speaker: "B", text: "The seventeen-year-old winger. Looks unreal." },
+        { speaker: "A", text: "Is he ready for the first team, though?" },
+        { speaker: "B", text: "Probably not. But give him ten minutes off the bench." },
+        { speaker: "A", text: "Get him some proper experience." },
+        { speaker: "B", text: "Don't keep him on the bench forever like last time." },
+        { speaker: "A", text: "You mean Johnson? What a waste that was." },
+        { speaker: "B", text: "He's scoring for fun elsewhere now. Should never have gone." },
+        { speaker: "A", text: "Classic us. Let the good ones leave, keep the passengers." },
+        { speaker: "B", text: "Tale as old as time. What's the table looking like?" },
+        { speaker: "A", text: "Mid-table, same as always." },
+        { speaker: "B", text: "Europe's miles off. Relegation's about six points." },
+        { speaker: "A", text: "Ideal position if you enjoy anxiety." },
+        { speaker: "B", text: "My dad's blood pressure can't take much more of it." },
+        { speaker: "A", text: "Mine still does the pools, if you can believe it." },
+        { speaker: "B", text: "Bless him. That's proper old-school." },
+        { speaker: "A", text: "Are you going to the next home game?" },
+        { speaker: "B", text: "Should be. You fancy meeting at The Crown first?" },
+        { speaker: "A", text: "Always. Two o'clock? Get a pint and a pie in." },
+        { speaker: "B", text: "Deal. And don't be late like last time." },
+        { speaker: "A", text: "That wasn't my fault. The train was cancelled." },
+        { speaker: "B", text: "It's always the train though, isn't it?" },
+        { speaker: "A", text: "Northern Rail, our other nemesis. Alright, I'll get the first round." },
+        { speaker: "B", text: "Music to my ears. Right, I need to crack on with work." },
+        { speaker: "A", text: "Same. Message me if they announce the line-up early." },
+        { speaker: "B", text: "Will do. Come on you reds." },
+        { speaker: "A", text: "Come on you reds. See you Saturday." },
+        { speaker: "B", text: "Saturday. Don't forget your scarf this time." },
+        { speaker: "A", text: "One time, mate. Let it go." },
+        { speaker: "B", text: "Never. Cheers, take care." },
+      ],
+    },
+    {
+      id: "films", title: "Films", category: "Small talk", a: "Lucy", b: "Harry",
+      lines: [
+        { speaker: "A", text: "Have you been to the cinema lately?" },
+        { speaker: "B", text: "Last week, actually. First time in ages." },
+        { speaker: "A", text: "What did you go and see?" },
+        { speaker: "B", text: "That new thriller with the guy from the BBC drama." },
+        { speaker: "A", text: "Oh, I've heard mixed things about that one." },
+        { speaker: "B", text: "Yeah, it's a slow burn. Probably not for everyone." },
+        { speaker: "A", text: "Slow burn usually means a bit boring, doesn't it?" },
+        { speaker: "B", text: "I'd say deliberate rather than boring. The payoff is worth it." },
+        { speaker: "A", text: "Fair. How long was it? I find that's the deal-breaker." },
+        { speaker: "B", text: "Two hours twenty. Felt about right, to be honest." },
+        { speaker: "A", text: "Anything over two and a half and I'm checking my phone." },
+        { speaker: "B", text: "Same. Some of these epics go on forever." },
+        { speaker: "A", text: "The new blockbuster's three hours, apparently." },
+        { speaker: "B", text: "Three hours? I'd need an interval." },
+        { speaker: "A", text: "Don't American cinemas just not have intervals?" },
+        { speaker: "B", text: "Exactly. Bizarre, when you think about it." },
+        { speaker: "A", text: "British cinema has its moments, though. Proper queues at the ice cream." },
+        { speaker: "B", text: "A ninety-nine at the interval. Absolute classic." },
+        { speaker: "A", text: "What's on your watchlist at the moment?" },
+        { speaker: "B", text: "The documentary about the Beatles. Everyone's been raving." },
+        { speaker: "A", text: "Get Back? Eight hours long, mind." },
+        { speaker: "B", text: "Eight hours? Oh. Maybe I'll split it over a weekend." },
+        { speaker: "A", text: "It's actually brilliant. Just weird to watch them bicker." },
+        { speaker: "B", text: "Fly-on-the-wall stuff is fascinating when it's real." },
+        { speaker: "A", text: "What about horror? Anything good recently?" },
+        { speaker: "B", text: "I don't really do horror. It lives in my head for weeks." },
+        { speaker: "A", text: "Fair. I can do thrillers but proper horror breaks me." },
+        { speaker: "B", text: "The Babadook is still the scariest I've seen." },
+        { speaker: "A", text: "That wardrobe scene. No thank you, ever." },
+        { speaker: "B", text: "I slept with the light on. I'm not ashamed to say it." },
+        { speaker: "A", text: "What's your comfort film? The one you rewatch." },
+        { speaker: "B", text: "Paddington two. Unironically. It's perfect." },
+        { speaker: "A", text: "It genuinely is. Hugh Grant is phenomenal." },
+        { speaker: "B", text: "I'd watch him do anything after that. He's having a renaissance." },
+        { speaker: "A", text: "My comfort is Notting Hill. Basic, I know." },
+        { speaker: "B", text: "Not basic. That film's a comfort blanket." },
+        { speaker: "A", text: "The bookshop scene. The press conference scene. Perfect." },
+        { speaker: "B", text: "The blue door? You can still visit it, apparently." },
+        { speaker: "A", text: "Did that once on a Sunday. Felt like a total tourist." },
+        { speaker: "B", text: "You are a total tourist, in your own city." },
+        { speaker: "A", text: "Embracing it, aren't I? What's your thoughts on Oscar season?" },
+        { speaker: "B", text: "Bit bloated this year. Nothing's really jumped out." },
+        { speaker: "A", text: "The indie film from Ireland, though. That looked interesting." },
+        { speaker: "B", text: "Oh yes. Small cast, big feelings. My favourite kind." },
+        { speaker: "A", text: "Do you prefer cinema or streaming these days?" },
+        { speaker: "B", text: "Cinema for the proper ones. Sofa for everything else." },
+        { speaker: "A", text: "Same. Some films just need the big screen." },
+        { speaker: "B", text: "Dune on a phone. Unthinkable. Honestly." },
+        { speaker: "A", text: "Crime against cinema, that would be." },
+        { speaker: "B", text: "Are you going this weekend? Fancy something?" },
+        { speaker: "A", text: "I could be convinced. What's showing Saturday afternoon?" },
+        { speaker: "B", text: "The Japanese animation. Subtitles, but supposed to be stunning." },
+        { speaker: "A", text: "I'm in. Three o'clock at the Picturehouse?" },
+        { speaker: "B", text: "Perfect. I'll book the tickets now." },
+        { speaker: "A", text: "Proper seats, please. None of those rickety front ones." },
+        { speaker: "B", text: "Middle row, naturally. I know the rules." },
+        { speaker: "A", text: "And a large popcorn. For sharing, obviously." },
+        { speaker: "B", text: "Obviously. You always eat three quarters of it though." },
+        { speaker: "A", text: "Slander. Utter slander. See you Saturday." },
+        { speaker: "B", text: "Saturday. Can't wait. I'll bring smuggled snacks in too." },
+      ],
+    },
+    {
+      id: "singers", title: "Singers", category: "Small talk", a: "Emma", b: "Chloe",
+      lines: [
+        { speaker: "A", text: "Did you end up getting tickets for the tour?" },
+        { speaker: "B", text: "Got them. Paid an absolute fortune, but got them." },
+        { speaker: "A", text: "I refreshed the page for forty minutes and got nothing." },
+        { speaker: "B", text: "The queue system is a shambles every single time." },
+        { speaker: "A", text: "Dynamic pricing on top of it? Don't get me started." },
+        { speaker: "B", text: "Four hundred quid for a standing ticket. That can't be right." },
+        { speaker: "A", text: "I remember when fifty was outrageous." },
+        { speaker: "B", text: "We're getting old, aren't we?" },
+        { speaker: "A", text: "Ancient. Anyway, which night did you get?" },
+        { speaker: "B", text: "The Saturday. Hopefully the sound's better by then." },
+        { speaker: "A", text: "First night's always a bit rough apparently." },
+        { speaker: "B", text: "You learn that the hard way, I guess." },
+        { speaker: "A", text: "Who's supporting, do we know?" },
+        { speaker: "B", text: "Someone new I've never heard of. Streamed a few songs. Not bad." },
+        { speaker: "A", text: "Supports are the real discovery moments, though." },
+        { speaker: "B", text: "Ha, true. Three of my favourite artists I saw as supports first." },
+        { speaker: "A", text: "What are you listening to at the moment?" },
+        { speaker: "B", text: "Lots of the new folk stuff, actually. Really into it." },
+        { speaker: "A", text: "British folk or American?" },
+        { speaker: "B", text: "A mix. Mostly the West Country lot though." },
+        { speaker: "A", text: "Good harmonies on that scene. Proper vocal stuff." },
+        { speaker: "B", text: "Exactly. After years of autotune, it's refreshing." },
+        { speaker: "A", text: "Autotune has its place, mind. Some of it's genuinely good." },
+        { speaker: "B", text: "Fair. I'm not anti, just bored of the default sound." },
+        { speaker: "A", text: "Who's your artist of the year so far?" },
+        { speaker: "B", text: "Honestly? The singer-songwriter from Bristol. Just her and a piano." },
+        { speaker: "A", text: "I need to check her out. What's a good starting track?" },
+        { speaker: "B", text: "The one about her grandad. Absolutely devastating." },
+        { speaker: "A", text: "You're selling it with enthusiasm there, aren't you." },
+        { speaker: "B", text: "Devastating in the good way. You'll cry, then feel better." },
+        { speaker: "A", text: "Very specific. Very British. Alright, I'll give it a go." },
+        { speaker: "B", text: "Who've you been into recently?" },
+        { speaker: "A", text: "Mostly seventies stuff, actually. Proper soft rock." },
+        { speaker: "B", text: "Oh, dad-core. Respectable." },
+        { speaker: "A", text: "Fleetwood Mac are objectively perfect. I'll die on that hill." },
+        { speaker: "B", text: "Rumours is flawless. Every single song." },
+        { speaker: "A", text: "The Chain at a festival? Unreal." },
+        { speaker: "B", text: "Did you hear they're touring again?" },
+        { speaker: "A", text: "I heard. But at our age it's mostly tribute bands, isn't it?" },
+        { speaker: "B", text: "Harsh but fair. Some tribute acts are genuinely excellent." },
+        { speaker: "A", text: "The Bootleg Beatles are proper musicians in their own right." },
+        { speaker: "B", text: "Saw them at a festival. Genuinely brilliant." },
+        { speaker: "A", text: "Do you still listen to albums front to back?" },
+        { speaker: "B", text: "Not often. Playlists dominate my life, sadly." },
+        { speaker: "A", text: "I try, but I always skip about halfway in." },
+        { speaker: "B", text: "A proper album with a story though. That's still a treat." },
+        { speaker: "A", text: "Concept albums are a dying art, I reckon." },
+        { speaker: "B", text: "Attention spans. Everyone wants the single." },
+        { speaker: "A", text: "Has to land in the first fifteen seconds now." },
+        { speaker: "B", text: "That's TikTok's fault, frankly." },
+        { speaker: "A", text: "Bit of a grumpy old lady line, there." },
+        { speaker: "B", text: "Earning it day by day, me. Karaoke on Friday?" },
+        { speaker: "A", text: "Oh no, not again." },
+        { speaker: "B", text: "You loved it last time. Your rendition of Dancing Queen." },
+        { speaker: "A", text: "Loved isn't the word. Endured, maybe." },
+        { speaker: "B", text: "Come on, it's a laugh. Drinks are on me." },
+        { speaker: "A", text: "Alright, you've got me. Eight o'clock at the usual place?" },
+        { speaker: "B", text: "Eight o'clock. Warm up those pipes." },
+        { speaker: "A", text: "I'll be needing a very strong drink beforehand." },
+        { speaker: "B", text: "Two, at least. See you Friday, my love." },
+      ],
+    },
+    {
+      id: "anime", title: "Anime", category: "Small talk", a: "Ben", b: "Jack",
+      lines: [
+        { speaker: "A", text: "Have you caught up on the latest episode yet?" },
+        { speaker: "B", text: "Watched it last night. No spoilers, please." },
+        { speaker: "A", text: "Don't worry, I'll keep it vague. What did you make of the fight?" },
+        { speaker: "B", text: "Animation was absolutely insane. That studio's on fire." },
+        { speaker: "A", text: "The sakuga moment in the middle? I rewound it four times." },
+        { speaker: "B", text: "Same. Proper frame-by-frame stuff." },
+        { speaker: "A", text: "Are you keeping up with the manga too, or purely anime?" },
+        { speaker: "B", text: "Anime only. I don't want to know what's coming." },
+        { speaker: "A", text: "Discipline. I cracked months ago." },
+        { speaker: "B", text: "I read ahead on one series and ruined it. Never again." },
+        { speaker: "A", text: "Which one? Dare I ask?" },
+        { speaker: "B", text: "The big one with the titans. You know the one." },
+        { speaker: "A", text: "Oh yeah, the ending was controversial." },
+        { speaker: "B", text: "That's putting it mildly. Fandom civil war for months." },
+        { speaker: "A", text: "Endings are so hard to stick. Rare to see a good one." },
+        { speaker: "B", text: "Your Lie in April got it right. Cried for a week, but right." },
+        { speaker: "A", text: "Oh, that soundtrack, though. Genuinely beautiful." },
+        { speaker: "B", text: "Chopin all the way through. No other anime touches it." },
+        { speaker: "A", text: "What's your favourite of all time? Pick one." },
+        { speaker: "B", text: "Impossible question. But Cowboy Bebop, probably." },
+        { speaker: "A", text: "Solid answer. The soundtrack on that is chef's kiss." },
+        { speaker: "B", text: "The opening alone. Tank. Pure energy." },
+        { speaker: "A", text: "Yoko Kanno is a genius. Proper era-defining stuff." },
+        { speaker: "B", text: "What about yours? Single favourite." },
+        { speaker: "A", text: "Mushishi. Slow, quiet, beautiful. Exactly my speed." },
+        { speaker: "B", text: "Love that show. A different pace entirely." },
+        { speaker: "A", text: "Some episodes are basically folk tales. Proper meditative." },
+        { speaker: "B", text: "Ideal Sunday evening telly." },
+        { speaker: "A", text: "Are you watching the new season of the sports one?" },
+        { speaker: "B", text: "Course. Three episodes in, already hooked." },
+        { speaker: "A", text: "Sports anime has no right to be this good. Every time." },
+        { speaker: "B", text: "Haikyuu made me care about volleyball. Volleyball." },
+        { speaker: "A", text: "Exactly. I'll watch any sport if an anime tells me to." },
+        { speaker: "B", text: "Chess, cycling, even competitive karuta. They pulled it off." },
+        { speaker: "A", text: "The magic is always the characters, isn't it." },
+        { speaker: "B", text: "Training arcs shouldn't work, but they always do." },
+        { speaker: "A", text: "Do you watch subbed or dubbed?" },
+        { speaker: "B", text: "Subbed, exclusively. Dubs are hit or miss." },
+        { speaker: "A", text: "Some dubs are brilliant though. Bebop's English cast, legendary." },
+        { speaker: "B", text: "Fair. That's the exception, not the rule." },
+        { speaker: "A", text: "Have you been to an anime convention?" },
+        { speaker: "B", text: "Once. Chaotic. Brilliant. Wouldn't do it sober again." },
+        { speaker: "A", text: "Cosplay was a highlight, I bet." },
+        { speaker: "B", text: "The craftsmanship on some of them, you wouldn't believe." },
+        { speaker: "A", text: "Full armour, LEDs, the lot." },
+        { speaker: "B", text: "Months of work for one weekend. That's dedication." },
+        { speaker: "A", text: "What's underrated, in your view?" },
+        { speaker: "B", text: "Mushoku Tensei? Controversial start, but the craft is top tier." },
+        { speaker: "A", text: "You have to get past that first episode, granted." },
+        { speaker: "B", text: "Once you do, the worldbuilding's genuinely incredible." },
+        { speaker: "A", text: "What's on your watchlist next?" },
+        { speaker: "B", text: "Frieren. Everyone keeps telling me to watch it." },
+        { speaker: "A", text: "Believe the hype on that one. It's special." },
+        { speaker: "B", text: "Specifically what kind of special?" },
+        { speaker: "A", text: "A quiet fantasy about time and memory. Doesn't sound like much." },
+        { speaker: "B", text: "But it is much. That's the vibe, isn't it?" },
+        { speaker: "A", text: "Exactly. You'll feel things. In a good way." },
+        { speaker: "B", text: "Sold. I'll start tonight. You around at the weekend?" },
+        { speaker: "A", text: "Watch party Saturday? Bring snacks." },
+        { speaker: "B", text: "Deal. Seven o'clock. Ramen? My treat." },
+        { speaker: "A", text: "Always. See you Saturday, mate." },
+      ],
+    },
+    {
+      id: "gcse", title: "Helping a teenager with GCSE prep", category: "Family", a: "Mum", b: "Milo",
+      lines: [
+        { speaker: "A", text: "Right, Milo, have you started revising for maths yet?" },
+        { speaker: "B", text: "A bit. I looked at it yesterday for about ten minutes." },
+        { speaker: "A", text: "Ten minutes isn't really revising, love." },
+        { speaker: "B", text: "I did do some questions though. Honestly." },
+        { speaker: "A", text: "Which topics are you struggling with most?" },
+        { speaker: "B", text: "Trigonometry. I don't get why we need it." },
+        { speaker: "A", text: "You need it to pass the exam, for a start." },
+        { speaker: "B", text: "Yeah, but I'm not going to use it, am I?" },
+        { speaker: "A", text: "That's not the point right now. Pass first, argue later." },
+        { speaker: "B", text: "Fine. Can you actually help with it, though?" },
+        { speaker: "A", text: "I'll have a go. It's been a while, mind." },
+        { speaker: "B", text: "You always say that and then it turns out you know it perfectly." },
+        { speaker: "A", text: "Flattery won't get you out of revision, but thanks." },
+        { speaker: "B", text: "What about English? I've got coursework due Tuesday." },
+        { speaker: "A", text: "Tuesday? And you're telling me on Sunday afternoon?" },
+        { speaker: "B", text: "I've got until Tuesday, though. Plenty of time." },
+        { speaker: "A", text: "Let's start it today. Otherwise Monday night becomes a nightmare." },
+        { speaker: "B", text: "Alright, alright. What do you want me to do first?" },
+        { speaker: "A", text: "Read the question out loud. The whole thing." },
+        { speaker: "B", text: "Analyse the presentation of power in the opening chapter." },
+        { speaker: "A", text: "Good. Now what do you actually think that means?" },
+        { speaker: "B", text: "Who has power, how they have it, and how the writer shows it." },
+        { speaker: "A", text: "Brilliant. You already know what to do." },
+        { speaker: "B", text: "But I don't know what to write." },
+        { speaker: "A", text: "Start with three quotes that show power. Just three." },
+        { speaker: "B", text: "I can find three. Probably." },
+        { speaker: "A", text: "Find them, write them down, then we'll build from there." },
+        { speaker: "B", text: "Do I have to memorise quotes? For the actual exam?" },
+        { speaker: "A", text: "Afraid so. Ten short ones is better than three long ones." },
+        { speaker: "B", text: "How on earth do people remember all those quotes?" },
+        { speaker: "A", text: "Spaced repetition. Look at them every day for two weeks." },
+        { speaker: "B", text: "That sounds exhausting." },
+        { speaker: "A", text: "Five minutes a day, Milo. You spend an hour on TikTok." },
+        { speaker: "B", text: "TikTok is my break. It's essential." },
+        { speaker: "A", text: "Right. Let's set up a proper routine. Hour a day, minimum." },
+        { speaker: "B", text: "An hour? Every day?" },
+        { speaker: "A", text: "Split it up. Thirty minutes after school, thirty in the evening." },
+        { speaker: "B", text: "Weekends too?" },
+        { speaker: "A", text: "Two hours Saturday. Proper go, not watching YouTube alongside." },
+        { speaker: "B", text: "That's actually reasonable, I suppose." },
+        { speaker: "A", text: "I know. Your mother isn't a monster." },
+        { speaker: "B", text: "Debatable. Can I do half in my room and half at the kitchen table?" },
+        { speaker: "A", text: "Kitchen's better. I can check you're not on your phone." },
+        { speaker: "B", text: "Don't you trust me?" },
+        { speaker: "A", text: "I trust the seventeen-year-old version of you, not the fifteen-year-old." },
+        { speaker: "B", text: "Harsh. But fair, I guess." },
+        { speaker: "A", text: "What about science? Which paper's first?" },
+        { speaker: "B", text: "Biology, Wednesday. Then chemistry and physics the week after." },
+        { speaker: "A", text: "Do you have the past papers downloaded?" },
+        { speaker: "B", text: "Mr Hassan gave us a USB stick with them all." },
+        { speaker: "A", text: "Brilliant. Do one under timed conditions this weekend." },
+        { speaker: "B", text: "Full paper? That's ninety minutes." },
+        { speaker: "A", text: "Yes. The real thing. Mock it properly." },
+        { speaker: "B", text: "Can I do it in bits?" },
+        { speaker: "A", text: "No. Because the real exam won't be in bits." },
+        { speaker: "B", text: "Alright. Fine. Saturday morning, nine till half ten." },
+        { speaker: "A", text: "Perfect. I'll mark it for you afterwards." },
+        { speaker: "B", text: "Are you actually going to be fair, mum?" },
+        { speaker: "A", text: "Ruthlessly fair. Better now than in June." },
+        { speaker: "B", text: "Right. Can we have pizza tonight, though? As a motivation thing." },
+        { speaker: "A", text: "Finish the English plan first. Then we'll talk pizza." },
+      ],
+    },
+    {
+      id: "manager-121", title: "1-to-1 with manager", category: "Office", a: "Sam", b: "Alex",
+      lines: [
+        { speaker: "A", text: "Morning. How's your week been, overall?" },
+        { speaker: "B", text: "Busy, but good. Finally shipped the auth change on Tuesday." },
+        { speaker: "A", text: "Brilliant. Any fallout from it?" },
+        { speaker: "B", text: "One small regression. Fixed it in under an hour." },
+        { speaker: "A", text: "Good work. Was it caught by tests or customers?" },
+        { speaker: "B", text: "Tests, thankfully. Before it hit production." },
+        { speaker: "A", text: "Exactly what those tests are there for. Nice one." },
+        { speaker: "B", text: "Cheers. What's on your radar this week?" },
+        { speaker: "A", text: "Mostly the leadership offsite. Lots of prep." },
+        { speaker: "B", text: "Anything we should know about coming out of it?" },
+        { speaker: "A", text: "Budget announcements, mainly. Nothing scary so far." },
+        { speaker: "B", text: "Will headcount be affected?" },
+        { speaker: "A", text: "Honestly, not expecting it. But I'll be clearer next week." },
+        { speaker: "B", text: "Appreciate the straight answer. Easier than speculating." },
+        { speaker: "A", text: "Always. Let's talk about your goals for the quarter." },
+        { speaker: "B", text: "Yep. Still the three we set last month?" },
+        { speaker: "A", text: "Roughly. Are any of them feeling unrealistic yet?" },
+        { speaker: "B", text: "The third one. It depends on another team delivering." },
+        { speaker: "A", text: "Which team, specifically?" },
+        { speaker: "B", text: "Platform. They've been overstretched for months." },
+        { speaker: "A", text: "Fair. Let's rephrase it to something you can actually own." },
+        { speaker: "B", text: "Thought you'd say that. I'll draft a new version by Friday." },
+        { speaker: "A", text: "Perfect. How are you feeling about the dashboard project?" },
+        { speaker: "B", text: "Good. Scope's clear. Stakeholders are aligned, surprisingly." },
+        { speaker: "A", text: "That's rare. Enjoy it while it lasts." },
+        { speaker: "B", text: "Any guesses what might derail it?" },
+        { speaker: "A", text: "Data quality, usually. Look at that early." },
+        { speaker: "B", text: "Good shout. I'll ask Priya for a data audit next week." },
+        { speaker: "A", text: "Great. What about growth stuff? Still thinking about the next level?" },
+        { speaker: "B", text: "Yeah. Reading the framework. Trying to find concrete examples." },
+        { speaker: "A", text: "Share a few of those examples with me when you have them." },
+        { speaker: "B", text: "Will do. It'd help to test my read against yours." },
+        { speaker: "A", text: "Exactly the right approach. Not a solo exercise." },
+        { speaker: "B", text: "Can I ask something slightly awkward?" },
+        { speaker: "A", text: "Go on. Nothing's off-limits here." },
+        { speaker: "B", text: "Am I actually seen as a strong performer?" },
+        { speaker: "A", text: "Yes. Very clearly so. Why do you ask?" },
+        { speaker: "B", text: "I don't always get that impression, to be honest." },
+        { speaker: "A", text: "What's giving you the opposite impression?" },
+        { speaker: "B", text: "Silence, mostly. Nobody says anything either way." },
+        { speaker: "A", text: "That's fair feedback. I'll be more explicit about the good stuff." },
+        { speaker: "B", text: "Appreciate that. It's easy to assume the worst otherwise." },
+        { speaker: "A", text: "It is. And I know it. Thanks for raising it." },
+        { speaker: "B", text: "How are you holding up, by the way?" },
+        { speaker: "A", text: "Tired. It's been a long month of context switching." },
+        { speaker: "B", text: "Anything I can help take off your plate?" },
+        { speaker: "A", text: "Maybe the monthly report. If you fancy drafting it." },
+        { speaker: "B", text: "Happy to. Send me last month's as a template?" },
+        { speaker: "A", text: "Will do after this. Thanks, genuinely." },
+        { speaker: "B", text: "No worries. What's the other thing on your mind?" },
+        { speaker: "A", text: "Succession, honestly. If I were hit by a bus tomorrow." },
+        { speaker: "B", text: "Dark but practical. Fair point to think about." },
+        { speaker: "A", text: "You'd be on the shortlist, for what it's worth." },
+        { speaker: "B", text: "That's good to know. Not that I want you hit by a bus." },
+        { speaker: "A", text: "Noted. I'll stay off the road, just to be safe." },
+        { speaker: "B", text: "Right. Anything else before we wrap?" },
+        { speaker: "A", text: "No. Same time next week? Actions in the doc?" },
+        { speaker: "B", text: "Perfect. I'll update it now while it's fresh." },
+        { speaker: "A", text: "Good. Have a decent weekend. Don't check email." },
+        { speaker: "B", text: "You don't either. Lead by example, boss." },
+      ],
+    },
+  ];
 </script>
 
 </body>

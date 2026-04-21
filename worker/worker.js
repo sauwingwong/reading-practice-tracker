@@ -332,6 +332,72 @@ async function handleGenerate(request, env) {
   }
 }
 
+// ── Delivery scoring (Gemini 2.5 Flash, multimodal audio) ─────────────────
+async function handleScoreLine(request, env) {
+  const { target, audioBase64, mime } = await request.json();
+  if (!target || !audioBase64) {
+    return Response.json({ error: "target and audioBase64 required" }, { status: 400 });
+  }
+  if (!env.GEMINI_API_KEY) {
+    return Response.json({ error: "Missing GEMINI_API_KEY secret" }, { status: 500 });
+  }
+  const audioMime = mime || "audio/webm";
+  const prompt = [
+    `You are a Standard Southern British English (SSBE / RP) pronunciation coach.`,
+    `Target line: "${target}"`,
+    `The attached audio is the learner reading that line aloud.`,
+    `Score pronunciation 0–100 and list 2–4 concrete, short coaching notes.`,
+    `Focus on: weak forms (schwa for function words), catenation/linking-r, glottal T, aspiration of /p t k/, stress timing, intonation.`,
+    `Respond with STRICT JSON only, no markdown fences:`,
+    `{"pct": <integer 0-100>, "notes": ["<short note>", "<short note>", ...]}`,
+  ].join("\n");
+  try {
+    const res = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": env.GEMINI_API_KEY,
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inline_data: { mime_type: audioMime, data: audioBase64 } },
+            ],
+          }],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 800,
+            thinkingConfig: { thinkingBudget: 0 },
+            responseMimeType: "application/json",
+          },
+        }),
+      }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      return Response.json({ error: `Gemini score failed: ${errText}` }, { status: 502 });
+    }
+    const json = await res.json();
+    const text = json?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!text) return Response.json({ error: "Empty score response" }, { status: 502 });
+    let parsed;
+    try { parsed = JSON.parse(text); }
+    catch (_) {
+      const m = text.match(/\{[\s\S]*\}/);
+      if (!m) return Response.json({ error: "Non-JSON score response" }, { status: 502 });
+      parsed = JSON.parse(m[0]);
+    }
+    const pct = Math.max(0, Math.min(100, Math.round(Number(parsed.pct) || 0)));
+    const notes = Array.isArray(parsed.notes) ? parsed.notes.map(String).slice(0, 6) : [];
+    return Response.json({ pct, notes });
+  } catch (err) {
+    return Response.json({ error: err.message || String(err) }, { status: 502 });
+  }
+}
+
 function buildSentencePrompt(brief) {
   return `Generate exactly ONE natural British English sentence (10–20 words) suitable for pronunciation practice.
 The sentence MUST be rich in: ${brief}.
@@ -493,6 +559,8 @@ export default {
         res = await handleTts(request, env);
       } else if (request.method === "POST" && url.pathname === "/generate") {
         res = await handleGenerate(request, env);
+      } else if (request.method === "POST" && url.pathname === "/score-line") {
+        res = await handleScoreLine(request, env);
       } else {
         res = Response.json({ error: "Not found" }, { status: 404 });
       }
