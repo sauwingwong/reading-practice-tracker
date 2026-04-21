@@ -764,7 +764,9 @@
       <div class="record-row">
         <button id="drill-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('drill')">● Record</button>
         <span id="drill-record-status" class="record-status"></span>
+        <button id="drill-deep-btn" class="practice-btn" style="display:none; padding:4px 12px; font-size:12px" onclick="practiceDeepScore('drill')" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>
       </div>
+      <div id="drill-score-panel"></div>
       <div id="drill-playback-row" style="display:none; align-items:center; gap:10px">
         <audio id="drill-playback" controls style="flex:1"></audio>
         <a id="drill-download" download="drill.webm" class="practice-btn" style="text-decoration:none">⬇ Download</a>
@@ -811,7 +813,9 @@
         <div class="record-row">
           <button id="pa-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pa')">● Record</button>
           <span id="pa-record-status" class="record-status"></span>
+          <button id="pa-deep-btn" class="practice-btn" style="display:none; padding:4px 12px; font-size:12px" onclick="practiceDeepScore('pa')" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>
         </div>
+        <div id="pa-score-panel"></div>
         <div id="pa-playback-row" style="display:none; align-items:center; gap:10px">
           <audio id="pa-playback" controls style="flex:1"></audio>
           <a id="pa-download" download="practice.webm" class="practice-btn" style="text-decoration:none">⬇ Download</a>
@@ -874,7 +878,9 @@
         <div class="record-row">
           <button id="pg-record-btn" class="practice-btn practice-btn-record" onclick="toggleRecording('pg')">● Record</button>
           <span id="pg-record-status" class="record-status"></span>
+          <button id="pg-deep-btn" class="practice-btn" style="display:none; padding:4px 12px; font-size:12px" onclick="practiceDeepScore('pg')" title="Send recording to Gemini 2.5 for phonetic feedback">🤖 Deep score</button>
         </div>
+        <div id="pg-score-panel"></div>
         <div id="pg-playback-row" style="display:none; align-items:center; gap:10px">
           <audio id="pg-playback" controls style="flex:1"></audio>
           <a id="pg-download" download="practice.webm" class="practice-btn" style="text-decoration:none">⬇ Download</a>
@@ -16771,12 +16777,22 @@
   }
 
   // ── RECORDING (shared) ─────────────────────────────────────────────────────
-  let practiceRecorder  = null;
-  let practiceChunks    = [];
-  let practiceStream    = null;
-  let practiceRecording = false;
-  let practiceTimer     = null;
-  let practicePrefix    = null;
+  let practiceRecorder   = null;
+  let practiceChunks     = [];
+  let practiceStream     = null;
+  let practiceRecording  = false;
+  let practiceTimer      = null;
+  let practicePrefix     = null;
+  let practiceRecognizer = null;
+  // Per-prefix last-blob snapshot for Deep Score reuse
+  const practiceLastBlob = {}; // prefix -> { blob, mime, target }
+
+  function getPracticeTarget(prefix) {
+    if (prefix === "drill") return currentDrillCard ? currentDrillCard.text : "";
+    if (prefix === "pa")    return document.getElementById("pa-sentence").value.trim();
+    if (prefix === "pg")    return currentGeneratedText || "";
+    return "";
+  }
 
   async function toggleRecording(prefix) {
     if (practiceRecording) {
@@ -16800,14 +16816,20 @@
     practiceRecorder = new MediaRecorder(practiceStream, { mimeType: mime });
     practiceRecorder.ondataavailable = e => { if (e.data.size > 0) practiceChunks.push(e.data); };
     practiceRecorder.onstop = () => {
-      const blob  = new Blob(practiceChunks, { type: practiceRecorder.mimeType });
-      const url   = URL.createObjectURL(blob);
+      const blob = new Blob(practiceChunks, { type: practiceRecorder.mimeType });
+      const url  = URL.createObjectURL(blob);
       const audio = document.getElementById(practicePrefix + "-playback");
       const dl    = document.getElementById(practicePrefix + "-download");
       const row   = document.getElementById(practicePrefix + "-playback-row");
       audio.src = url;
       dl.href   = url;
       row.style.display = "flex";
+      // Stash for Deep Score
+      practiceLastBlob[practicePrefix] = {
+        blob, mime: practiceRecorder.mimeType, target: getPracticeTarget(practicePrefix),
+      };
+      const deepBtn = document.getElementById(practicePrefix + "-deep-btn");
+      if (deepBtn) deepBtn.style.display = "inline-block";
     };
     practiceRecorder.start(100);
     practiceRecording = true;
@@ -16825,6 +16847,41 @@
       statusEl.textContent = `Recording… ${m}:${s}`;
       statusEl.classList.add("live");
     }, 1000);
+
+    // Also run Web Speech recognition for instant word-level scoring
+    const target = getPracticeTarget(prefix);
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    practiceRecognizer = null;
+    if (SR && target) {
+      try {
+        const r = new SR();
+        r.lang = "en-GB";
+        r.interimResults = false;
+        r.maxAlternatives = 1;
+        r.continuous = true; // keep listening for longer passages
+        const transcripts = [];
+        r.onresult = (e) => {
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) transcripts.push(e.results[i][0].transcript);
+          }
+        };
+        r.onerror = (e) => {
+          const panel = document.getElementById(prefix + "-score-panel");
+          paintScoreInto(panel, { pct: 0, diff: [], error: e.error || "speech error" });
+        };
+        r.onend = () => {
+          const panel = document.getElementById(prefix + "-score-panel");
+          if (!panel) return;
+          const full = transcripts.join(" ").trim();
+          if (full) {
+            const result = scoreLine(target, full);
+            paintScoreInto(panel, result);
+          }
+        };
+        r.start();
+        practiceRecognizer = r;
+      } catch (_) { practiceRecognizer = null; }
+    }
   }
 
   function stopRecording() {
@@ -16841,12 +16898,43 @@
     statusEl.textContent = "";
     statusEl.classList.remove("live");
 
+    if (practiceRecognizer) {
+      try { practiceRecognizer.stop(); } catch (_) {}
+    }
+
     // Drill gate: unlock Reveal after first recording
     if (practicePrefix === "drill") {
       drillRecorded = true;
       const revealBtn = document.getElementById("drill-reveal-btn");
       revealBtn.disabled = false;
       revealBtn.title    = "";
+    }
+  }
+
+  async function practiceDeepScore(prefix) {
+    const rec = practiceLastBlob[prefix];
+    if (!rec || !rec.blob) { alert("Record yourself first."); return; }
+    if (!rec.target) { alert("No target text to score against."); return; }
+    const btn = document.getElementById(prefix + "-deep-btn");
+    if (btn) { btn.disabled = true; btn.textContent = "🤖 Scoring…"; }
+    try {
+      const arrayBuf = await rec.blob.arrayBuffer();
+      const base64 = arrayBufferToBase64(arrayBuf);
+      const res = await fetch(`${WORKER_URL}/score-line`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target: rec.target, audioBase64: base64, mime: rec.mime }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({ error: res.statusText }));
+        throw new Error(e.error || `Score error ${res.status}`);
+      }
+      const { pct, notes } = await res.json();
+      paintDeepScoreInto(document.getElementById(prefix + "-score-panel"), pct, notes);
+    } catch (err) {
+      alert("Deep score failed: " + err.message);
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = "🤖 Deep score"; }
     }
   }
 
@@ -17264,16 +17352,17 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     paintRpScore(lineIdx, result);
   }
 
-  function paintRpScore(lineIdx, result) {
-    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
-    if (!row) return;
-    row.querySelectorAll(".rp-score").forEach(e => e.remove());
+  // Generic — renders a speech score into any container element.
+  function paintScoreInto(hostEl, result) {
+    if (!hostEl) return;
+    hostEl.querySelectorAll(".rp-score.rp-speech-block").forEach(e => e.remove());
     const div = document.createElement("div");
-    div.className = "rp-score " + (result.error ? "rp-score-bad" :
-                                   result.pct >= 85 ? "rp-score-good" :
-                                   result.pct >= 60 ? "rp-score-warn" : "rp-score-bad");
+    div.className = "rp-score rp-speech-block " +
+                    (result.error ? "rp-score-bad" :
+                     result.pct >= 85 ? "rp-score-good" :
+                     result.pct >= 60 ? "rp-score-warn" : "rp-score-bad");
     if (result.error) {
-      div.innerHTML = `<span class="rp-score-pct">Error: ${result.error}</span>`;
+      div.innerHTML = `<span class="rp-score-pct">Error: ${escapeHtml(result.error)}</span>`;
     } else {
       const diffHtml = result.diff.map(d => {
         if (d.status === "ok")    return `<span>${escapeHtml(d.word)}</span>`;
@@ -17284,7 +17373,14 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
       }).join(" ");
       div.innerHTML = `<div><span class="rp-score-pct">${result.pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">heard: ${escapeHtml(result.heard || "")}</span></div><div class="rp-score-diff">${diffHtml}</div>`;
     }
-    row.appendChild(div);
+    hostEl.appendChild(div);
+  }
+
+  function paintRpScore(lineIdx, result) {
+    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
+    if (!row) return;
+    row.querySelectorAll(".rp-score").forEach(e => e.remove());
+    paintScoreInto(row, result);
   }
 
   function escapeHtml(s) {
@@ -17319,16 +17415,21 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     }
   }
 
-  function paintDeepScore(lineIdx, pct, notes) {
-    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
-    if (!row) return;
-    row.querySelectorAll(".rp-deep-block").forEach(e => e.remove());
+  // Generic — renders a deep-score result into any container.
+  function paintDeepScoreInto(hostEl, pct, notes) {
+    if (!hostEl) return;
+    hostEl.querySelectorAll(".rp-deep-block").forEach(e => e.remove());
     const div = document.createElement("div");
     const cls = pct >= 85 ? "rp-score-good" : pct >= 60 ? "rp-score-warn" : "rp-score-bad";
     div.className = `rp-score rp-deep-block ${cls}`;
     const notesHtml = (notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("");
     div.innerHTML = `<div><span class="rp-score-pct">🤖 ${pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">Gemini 2.5</span></div>${notesHtml ? `<ul class="rp-deep-notes">${notesHtml}</ul>` : ""}`;
-    row.appendChild(div);
+    hostEl.appendChild(div);
+  }
+
+  function paintDeepScore(lineIdx, pct, notes) {
+    const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
+    paintDeepScoreInto(row, pct, notes);
   }
 
   function arrayBufferToBase64(buf) {
