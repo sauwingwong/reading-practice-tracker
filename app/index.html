@@ -16988,7 +16988,12 @@
           const panel = document.getElementById(prefix + "-score-panel");
           if (!panel) return;
           const full = transcripts.join(" ").trim();
-          if (full) paintScoreInto(panel, scoreLine(target, full));
+          if (!full) return;
+          // Discard misrecognitions that came back in a non-Latin script
+          // (Chrome sometimes falls back to other languages on low-confidence
+          // audio). Basic Latin + common punctuation only → treat as English.
+          if (/[^\u0000-\u024F\u2010-\u2027\u2030-\u205F\s]/.test(full)) return;
+          paintScoreInto(panel, scoreLine(target, full));
         };
         r.start();
         practiceRecognizer = r;
@@ -17497,6 +17502,8 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   }
 
   function roleplayScoreSpeech(lineIdx, target, transcript) {
+    // Drop non-Latin misrecognitions (Chrome SR fallback quirk).
+    if (transcript && /[^\u0000-\u024F\u2010-\u2027\u2030-\u205F\s]/.test(transcript)) return;
     const result = scoreLine(target, transcript);
     paintRpScore(lineIdx, result);
   }
