@@ -16898,13 +16898,14 @@
       // Request a clean high-quality mono stream. Turning off DSP processing
       // avoids the "chopping" that browser noise suppression / AGC can introduce
       // on reading-practice speech with natural pauses.
+      // Let the mic run at its native sample rate (avoid forced resampling).
+      // DSP (echo/noise/AGC) stays off so reading pauses aren't gated.
       practiceStream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl:  false,
           channelCount:     1,
-          sampleRate:       48000,
         },
       });
     } catch (e) {
@@ -16917,7 +16918,7 @@
       ? "audio/webm;codecs=opus" : "audio/webm";
     practiceRecorder = new MediaRecorder(practiceStream, {
       mimeType:            mime,
-      audioBitsPerSecond:  128000,
+      audioBitsPerSecond:  96000, // plenty for voice; easier on the encoder
     });
     practiceRecorder.ondataavailable = e => { if (e.data.size > 0) practiceChunks.push(e.data); };
     practiceRecorder.onstop = () => {
@@ -16936,8 +16937,10 @@
       const deepBtn = document.getElementById(practicePrefix + "-deep-btn");
       if (deepBtn) deepBtn.style.display = "inline-block";
     };
-    // No timeslice: one final chunk on stop avoids inter-chunk micro-gaps.
-    practiceRecorder.start();
+    // 1s timeslice: flushes memory periodically (so long recordings don't
+    // buffer indefinitely and stutter) while keeping chunk boundaries rare
+    // enough that they don't glitch like a 100ms slice did.
+    practiceRecorder.start(1000);
     practiceRecording = true;
 
     const btn = document.getElementById(prefix + "-record-btn");
