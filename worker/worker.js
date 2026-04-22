@@ -274,7 +274,7 @@ const WEAKNESS_BRIEFS = {
 };
 
 async function handleGenerate(request, env) {
-  const { weaknesses, length, size } = await request.json();
+  const { weaknesses, length, size, intonation } = await request.json();
   if (!Array.isArray(weaknesses) || weaknesses.length === 0) {
     return Response.json({ error: "No weaknesses selected" }, { status: 400 });
   }
@@ -290,8 +290,8 @@ async function handleGenerate(request, env) {
   }
 
   const prompt = length === "passage"
-    ? buildPassagePrompt(briefs, size)
-    : buildSentencePrompt(briefs[0], size);
+    ? buildPassagePrompt(briefs, size, intonation)
+    : buildSentencePrompt(briefs[0], size, intonation);
 
   try {
     const res = await fetch(
@@ -415,18 +415,33 @@ async function handleScoreLine(request, env) {
   }
 }
 
-function buildSentencePrompt(brief, size) {
+const INTONATION_INSTRUCTIONS = `
+INTONATION MARKS — insert the following Unicode arrows INLINE at natural tone boundaries so a learner can see the target prosodic contour:
+  • Place "↗" IMMEDIATELY BEFORE a word whose accented syllable carries a rising tone. Rising tone is used for:
+    - yes/no questions ("Are you ↗coming?")
+    - non-final items in a list ("I bought ↗apples, ↗pears, and ↘bananas.")
+    - continuation within a long sentence, clause-final rise before "and/but/so"
+    - polite checks and soft invitations
+  • Place "↘" IMMEDIATELY BEFORE a word whose accented syllable carries a falling tone. Falling tone is used for:
+    - declarative statements (at the final stressed word)
+    - wh-questions ("What's your ↘name?")
+    - commands and final list items
+  • Use arrows sparingly — only on the one or two most prominent tone-bearing syllables per intonation phrase. Do NOT put an arrow on every word.
+  • Do not explain the arrows, do not add a legend.`;
+
+function buildSentencePrompt(brief, size, intonation) {
   const range =
     size === "short" ? "6–10 words"
     : size === "long"  ? "20–30 words"
     : "10–20 words"; // "med" or unspecified
+  const intoBlock = intonation ? "\n" + INTONATION_INSTRUCTIONS : "";
   return `Generate exactly ONE natural British English sentence (${range}) suitable for pronunciation practice.
 The sentence MUST be rich in: ${brief}.
-Use everyday conversational vocabulary. Pick a fresh mundane topic (e.g. weekend errands, a café, commuting, the weather, cooking, a phone call).
+Use everyday conversational vocabulary. Pick a fresh mundane topic (e.g. weekend errands, a café, commuting, the weather, cooking, a phone call).${intoBlock}
 Output ONLY the sentence itself — no quotes, no explanation, no heading.`;
 }
 
-function buildPassagePrompt(briefs, size) {
+function buildPassagePrompt(briefs, size, intonation) {
   const features = briefs.map((b, i) => `  ${i + 1}. ${b}`).join("\n");
   const words = [200, 500, 1000].includes(Number(size)) ? Number(size) : 500;
   const lo = Math.round(words * 0.9);
@@ -435,12 +450,13 @@ function buildPassagePrompt(briefs, size) {
     words <= 250 ? "2–3 short paragraphs"
     : words <= 600 ? "4–6 short paragraphs"
     : "7–10 short paragraphs";
+  const intoBlock = intonation ? "\n" + INTONATION_INSTRUCTIONS : "";
   return `Write a natural British English practice passage of ABOUT ${words} WORDS (accept ${lo}–${hi}).
 Split into ${paras}.
 Pick a fresh mundane everyday topic — vary it each time (e.g. a weekend train journey, a visit to the café, cooking a meal, a phone call with a friend, running errands, waiting at the post office, a rainy afternoon at home).
 
 The passage MUST distribute the following pronunciation features naturally and densely across the text:
-${features}
+${features}${intoBlock}
 
 Use natural connected speech that a native RP speaker would produce. Do NOT explain the features, do NOT annotate, do NOT add headings or a title. Output ONLY the passage prose.`;
 }

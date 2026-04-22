@@ -871,6 +871,16 @@
       </div>
 
       <div class="field">
+        <label>Options</label>
+        <div class="weakness-chips">
+          <button id="gopt-intonation" class="weakness-chip" onclick="toggleIntonation(this)" title="Insert ↗ rising / ↘ falling arrows at natural tone boundaries">↗↘ Intonation marks</button>
+        </div>
+        <div id="gopt-intonation-legend" style="display:none; font-size:11px; color:var(--text-dim); margin-top:6px">
+          ↗ rise (continuation, yes/no questions, list items) · ↘ fall (statements, commands, wh-questions, list end)
+        </div>
+      </div>
+
+      <div class="field">
         <button id="pg-generate-btn" class="practice-btn practice-btn-save" onclick="generatePassage()">✨ Generate</button>
         <span id="pg-generate-status" class="record-status"></span>
       </div>
@@ -16798,8 +16808,15 @@
     renderGeneratedPassage();
   }
 
-  let sentenceSize = "med";  // "short" | "med" | "long"
-  let passageSize  = 500;    // 200 | 500 | 1000
+  let sentenceSize   = "med";  // "short" | "med" | "long"
+  let passageSize    = 500;    // 200 | 500 | 1000
+  let intonationMark = false;
+
+  function toggleIntonation(btn) {
+    intonationMark = !intonationMark;
+    btn.classList.toggle("active", intonationMark);
+    document.getElementById("gopt-intonation-legend").style.display = intonationMark ? "" : "none";
+  }
 
   function setGenerateLength(mode) {
     generateLength = mode;
@@ -16871,6 +16888,7 @@
           weaknesses: [...selectedWeaknesses],
           length:     generateLength,
           size:       generateLength === "sentence" ? sentenceSize : passageSize,
+          intonation: intonationMark,
         }),
       });
       if (!res.ok) {
