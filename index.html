@@ -841,7 +841,21 @@
         <label>Length</label>
         <div class="weakness-chips">
           <button id="glen-sentence" class="weakness-chip active" onclick="setGenerateLength('sentence')">Sentence (single weakness)</button>
-          <button id="glen-passage"  class="weakness-chip"        onclick="setGenerateLength('passage')">Passage — 500 words (multiple)</button>
+          <button id="glen-passage"  class="weakness-chip"        onclick="setGenerateLength('passage')">Passage (multiple)</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Size</label>
+        <div class="weakness-chips" id="gsize-sentence">
+          <button id="gsize-s-short" class="weakness-chip"        onclick="setGenerateSize('short')">Short · 6–10 words</button>
+          <button id="gsize-s-med"   class="weakness-chip active" onclick="setGenerateSize('med')">Normal · 10–20 words</button>
+          <button id="gsize-s-long"  class="weakness-chip"        onclick="setGenerateSize('long')">Long · 20–30 words</button>
+        </div>
+        <div class="weakness-chips" id="gsize-passage" style="display:none">
+          <button id="gsize-p-200"  class="weakness-chip"        onclick="setGenerateSize(200)">200 words</button>
+          <button id="gsize-p-500"  class="weakness-chip active" onclick="setGenerateSize(500)">500 words</button>
+          <button id="gsize-p-1000" class="weakness-chip"        onclick="setGenerateSize(1000)">1000 words</button>
         </div>
       </div>
 
@@ -16784,10 +16798,15 @@
     renderGeneratedPassage();
   }
 
+  let sentenceSize = "med";  // "short" | "med" | "long"
+  let passageSize  = 500;    // 200 | 500 | 1000
+
   function setGenerateLength(mode) {
     generateLength = mode;
     document.getElementById("glen-sentence").classList.toggle("active", mode === "sentence");
     document.getElementById("glen-passage").classList.toggle("active",  mode === "passage");
+    document.getElementById("gsize-sentence").style.display = mode === "sentence" ? "" : "none";
+    document.getElementById("gsize-passage").style.display  = mode === "passage"  ? "" : "none";
     document.getElementById("pg-weakness-label").textContent =
       mode === "passage" ? "Target Weaknesses (select one or more)" : "Target Weakness (select one)";
     document.getElementById("pg-results-label").textContent =
@@ -16797,6 +16816,20 @@
       const [first] = selectedWeaknesses;
       selectedWeaknesses = new Set([first]);
       refreshWeaknessChips();
+    }
+  }
+
+  function setGenerateSize(size) {
+    if (generateLength === "sentence") {
+      sentenceSize = size;
+      ["short","med","long"].forEach(k => {
+        document.getElementById(`gsize-s-${k}`).classList.toggle("active", k === size);
+      });
+    } else {
+      passageSize = size;
+      [200,500,1000].forEach(k => {
+        document.getElementById(`gsize-p-${k}`).classList.toggle("active", k === size);
+      });
     }
   }
 
@@ -16837,6 +16870,7 @@
         body: JSON.stringify({
           weaknesses: [...selectedWeaknesses],
           length:     generateLength,
+          size:       generateLength === "sentence" ? sentenceSize : passageSize,
         }),
       });
       if (!res.ok) {

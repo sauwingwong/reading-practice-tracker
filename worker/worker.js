@@ -274,7 +274,7 @@ const WEAKNESS_BRIEFS = {
 };
 
 async function handleGenerate(request, env) {
-  const { weaknesses, length } = await request.json();
+  const { weaknesses, length, size } = await request.json();
   if (!Array.isArray(weaknesses) || weaknesses.length === 0) {
     return Response.json({ error: "No weaknesses selected" }, { status: 400 });
   }
@@ -290,8 +290,8 @@ async function handleGenerate(request, env) {
   }
 
   const prompt = length === "passage"
-    ? buildPassagePrompt(briefs)
-    : buildSentencePrompt(briefs[0]);
+    ? buildPassagePrompt(briefs, size)
+    : buildSentencePrompt(briefs[0], size);
 
   try {
     const res = await fetch(
@@ -306,7 +306,7 @@ async function handleGenerate(request, env) {
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.9,          // high variety across regenerations
-            maxOutputTokens: 4000,     // generous — 500-word passage ≈ 750 tokens, but thinking tokens also count
+            maxOutputTokens: 6000,     // 1000-word passage ≈ 1500 tokens; extra headroom for thinking tokens
             thinkingConfig: { thinkingBudget: 0 }, // disable internal reasoning; this is a shallow task
           },
         }),
@@ -415,17 +415,28 @@ async function handleScoreLine(request, env) {
   }
 }
 
-function buildSentencePrompt(brief) {
-  return `Generate exactly ONE natural British English sentence (10–20 words) suitable for pronunciation practice.
+function buildSentencePrompt(brief, size) {
+  const range =
+    size === "short" ? "6–10 words"
+    : size === "long"  ? "20–30 words"
+    : "10–20 words"; // "med" or unspecified
+  return `Generate exactly ONE natural British English sentence (${range}) suitable for pronunciation practice.
 The sentence MUST be rich in: ${brief}.
 Use everyday conversational vocabulary. Pick a fresh mundane topic (e.g. weekend errands, a café, commuting, the weather, cooking, a phone call).
 Output ONLY the sentence itself — no quotes, no explanation, no heading.`;
 }
 
-function buildPassagePrompt(briefs) {
+function buildPassagePrompt(briefs, size) {
   const features = briefs.map((b, i) => `  ${i + 1}. ${b}`).join("\n");
-  return `Write a natural British English practice passage of ABOUT 500 WORDS (accept 450–550).
-Split into 4–6 short paragraphs.
+  const words = [200, 500, 1000].includes(Number(size)) ? Number(size) : 500;
+  const lo = Math.round(words * 0.9);
+  const hi = Math.round(words * 1.1);
+  const paras =
+    words <= 250 ? "2–3 short paragraphs"
+    : words <= 600 ? "4–6 short paragraphs"
+    : "7–10 short paragraphs";
+  return `Write a natural British English practice passage of ABOUT ${words} WORDS (accept ${lo}–${hi}).
+Split into ${paras}.
 Pick a fresh mundane everyday topic — vary it each time (e.g. a weekend train journey, a visit to the café, cooking a meal, a phone call with a friend, running errands, waiting at the post office, a rainy afternoon at home).
 
 The passage MUST distribute the following pronunciation features naturally and densely across the text:
