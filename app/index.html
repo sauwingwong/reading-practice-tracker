@@ -17158,8 +17158,8 @@
         const e = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(e.error || `Score error ${res.status}`);
       }
-      const { pct, notes } = await res.json();
-      paintDeepScoreInto(document.getElementById(prefix + "-score-panel"), pct, notes);
+      const { pct, notes, heard, audio_quality } = await res.json();
+      paintDeepScoreInto(document.getElementById(prefix + "-score-panel"), { pct, notes, heard, audio_quality });
     } catch (err) {
       alert("Deep score failed: " + err.message);
     } finally {
@@ -17680,8 +17680,8 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
         const e = await res.json().catch(() => ({ error: res.statusText }));
         throw new Error(e.error || `Score error ${res.status}`);
       }
-      const { pct, notes } = await res.json();
-      paintDeepScore(lineIdx, pct, notes);
+      const { pct, notes, heard, audio_quality } = await res.json();
+      paintDeepScore(lineIdx, { pct, notes, heard, audio_quality });
     } catch (err) {
       alert("Deep score failed: " + err.message);
     } finally {
@@ -17690,20 +17690,30 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   }
 
   // Generic — renders a deep-score result into any container.
-  function paintDeepScoreInto(hostEl, pct, notes) {
+  function paintDeepScoreInto(hostEl, result) {
     if (!hostEl) return;
     hostEl.querySelectorAll(".rp-deep-block").forEach(e => e.remove());
+    const { pct, notes, heard, audio_quality } = result || {};
+    const aq = audio_quality || "clear";
     const div = document.createElement("div");
-    const cls = pct >= 85 ? "rp-score-good" : pct >= 60 ? "rp-score-warn" : "rp-score-bad";
+    let cls = pct >= 85 ? "rp-score-good" : pct >= 60 ? "rp-score-warn" : "rp-score-bad";
+    if (aq === "unintelligible") cls = "rp-score-bad";
     div.className = `rp-score rp-deep-block ${cls}`;
     const notesHtml = (notes || []).map(n => `<li>${escapeHtml(n)}</li>`).join("");
-    div.innerHTML = `<div><span class="rp-score-pct">🤖 ${pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">Gemini 2.5</span></div>${notesHtml ? `<ul class="rp-deep-notes">${notesHtml}</ul>` : ""}`;
+    const aqColor = aq === "clear" ? "var(--text-dim)"
+      : aq === "unintelligible" ? "#ff6b6b"
+      : "#e0a84a";
+    const heardText = heard && heard.trim()
+      ? `"${escapeHtml(heard)}"`
+      : `— (nothing intelligible)`;
+    const heardLine = `<div style="color:var(--text-dim); font-size:12px; margin-top:4px">🤖 heard: ${heardText} <span style="color:${aqColor}">· audio: ${escapeHtml(aq)}</span></div>`;
+    div.innerHTML = `<div><span class="rp-score-pct">🤖 ${pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">Gemini 2.5</span></div>${heardLine}${notesHtml ? `<ul class="rp-deep-notes">${notesHtml}</ul>` : ""}`;
     hostEl.appendChild(div);
   }
 
-  function paintDeepScore(lineIdx, pct, notes) {
+  function paintDeepScore(lineIdx, result) {
     const row = document.querySelector(`#rp-dialogue .rp-line[data-line-idx="${lineIdx}"]`);
-    paintDeepScoreInto(row, pct, notes);
+    paintDeepScoreInto(row, result);
   }
 
   function arrayBufferToBase64(buf) {

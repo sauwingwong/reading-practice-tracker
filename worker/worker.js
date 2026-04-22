@@ -344,12 +344,26 @@ async function handleScoreLine(request, env) {
   const audioMime = mime || "audio/webm";
   const prompt = [
     `You are a Standard Southern British English (SSBE / RP) pronunciation coach.`,
-    `Target line: "${target}"`,
-    `The attached audio is the learner reading that line aloud.`,
-    `Score pronunciation 0–100 and list 2–4 concrete, short coaching notes.`,
-    `Focus on: weak forms (schwa for function words), catenation/linking-r, glottal T, aspiration of /p t k/, stress timing, intonation.`,
-    `Respond with STRICT JSON only, no markdown fences:`,
-    `{"pct": <integer 0-100>, "notes": ["<short note>", "<short note>", ...]}`,
+    `The attached audio is a learner's ATTEMPT to read this target line:`,
+    `  "${target}"`,
+    ``,
+    `Do these steps in order, and be strict:`,
+    `1. Transcribe the audio verbatim — write EXACTLY what you hear, including`,
+    `   mispronunciations, missing words, filler, or silence. Do NOT assume the`,
+    `   learner said the target. If you hear nothing intelligible, return "".`,
+    `2. Assess audio quality: "clear" | "noisy" | "choppy" | "unintelligible".`,
+    `   "choppy" = dropouts, glitches, or truncated words.`,
+    `   "unintelligible" = too broken to evaluate pronunciation fairly.`,
+    `3. Compare the transcript to the target. Score pronunciation 0–100:`,
+    `   - If transcript is empty or audio is "unintelligible": pct MUST be ≤ 20.`,
+    `   - If audio is "choppy" OR transcript is missing many target words: pct ≤ 40.`,
+    `   - Otherwise score on SSBE features: weak forms (schwa for function words),`,
+    `     catenation/linking-r, glottal T, aspiration of /p t k/, stress timing, intonation.`,
+    `4. Write 2–4 short coaching notes. If audio quality capped the score, the`,
+    `   FIRST note must say so plainly (e.g. "Audio was choppy — re-record").`,
+    ``,
+    `Return STRICT JSON only, no markdown fences:`,
+    `{"pct": <integer 0-100>, "heard": "<verbatim transcript or empty string>", "audio_quality": "<clear|noisy|choppy|unintelligible>", "notes": ["<short note>", ...]}`,
   ].join("\n");
   try {
     const res = await fetch(
@@ -392,7 +406,10 @@ async function handleScoreLine(request, env) {
     }
     const pct = Math.max(0, Math.min(100, Math.round(Number(parsed.pct) || 0)));
     const notes = Array.isArray(parsed.notes) ? parsed.notes.map(String).slice(0, 6) : [];
-    return Response.json({ pct, notes });
+    const heard = typeof parsed.heard === "string" ? parsed.heard : "";
+    const audio_quality = ["clear","noisy","choppy","unintelligible"].includes(parsed.audio_quality)
+      ? parsed.audio_quality : "clear";
+    return Response.json({ pct, heard, audio_quality, notes });
   } catch (err) {
     return Response.json({ error: err.message || String(err) }, { status: 502 });
   }
