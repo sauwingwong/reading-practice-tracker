@@ -17007,21 +17007,32 @@
             if (e.results[i].isFinal) transcripts.push(e.results[i][0].transcript);
           }
         };
+        let lastErr = null;
         r.onerror = (e) => {
-          const panel = document.getElementById(prefix + "-score-panel");
-          if (e.error && e.error !== "no-speech") {
-            paintScoreInto(panel, { pct: 0, diff: [], error: e.error });
-          }
+          lastErr = e.error || "speech error";
+          console.log("[score] SR onerror:", lastErr);
         };
         r.onend = () => {
           const panel = document.getElementById(prefix + "-score-panel");
           if (!panel) return;
           const full = transcripts.join(" ").trim();
-          if (!full) return;
+          console.log("[score] SR onend. transcripts:", transcripts, "err:", lastErr);
+          if (!full) {
+            paintScoreInto(panel, {
+              pct: 0, diff: [],
+              error: lastErr === "no-speech"
+                ? "No speech detected — try speaking closer to the mic."
+                : (lastErr || "No transcript captured."),
+            });
+            return;
+          }
           // Discard misrecognitions that came back in a non-Latin script
           // (Chrome sometimes falls back to other languages on low-confidence
           // audio). Basic Latin + common punctuation only → treat as English.
-          if (/[^\u0000-\u024F\u2010-\u2027\u2030-\u205F\s]/.test(full)) return;
+          if (/[^\u0000-\u024F\u2010-\u2027\u2030-\u205F\s]/.test(full)) {
+            paintScoreInto(panel, { pct: 0, diff: [], error: "Recognised non-English text — try again." });
+            return;
+          }
           paintScoreInto(panel, scoreLine(target, full));
         };
         r.start();
