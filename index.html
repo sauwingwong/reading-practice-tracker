@@ -17085,14 +17085,12 @@
       practiceStream = null;
     }
 
-    // Stop and drop the recognizer too.
+    // Stop the recognizer but DO NOT null its handlers — onend fires
+    // asynchronously and that's what paints the score panel. We drop our
+    // own reference so a fresh recognizer gets created next time; the
+    // engine-held reference is released naturally once onend runs.
     if (practiceRecognizer) {
       try { practiceRecognizer.stop(); } catch (_) {}
-      try {
-        practiceRecognizer.onresult = null;
-        practiceRecognizer.onerror  = null;
-        practiceRecognizer.onend    = null;
-      } catch (_) {}
       practiceRecognizer = null;
     }
 
