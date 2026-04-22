@@ -912,7 +912,7 @@
           <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Play as</label>
           <button id="rp-role-a" class="rp-role-btn" onclick="pickRoleplayRole('A')"></button>
           <button id="rp-role-b" class="rp-role-btn" onclick="pickRoleplayRole('B')"></button>
-          <span id="rp-sr-warning" style="font-size:12px; color:var(--text-dim)"></span>
+          <button id="rp-copy-btn" class="rp-role-btn" onclick="copyRoleplayTranscript(this)" title="Copy full dialogue to clipboard — paste into ChatGPT for feedback" style="margin-left:auto">📋 Copy transcript</button>
         </div>
         <div id="rp-dialogue" class="rp-dialogue"></div>
       </div>
@@ -17346,6 +17346,32 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     document.getElementById("rp-role-a").classList.add("active");
     document.getElementById("rp-role-b").classList.remove("active");
     renderRoleplayDialogue();
+  }
+
+  function copyRoleplayTranscript(btn) {
+    const d = ROLEPLAY_DIALOGUES.find(x => x.id === currentTopicId);
+    if (!d) return;
+    const header = `${d.category} — ${d.title}\n${d.a} (A) ↔ ${d.b} (B)\n\n`;
+    const body = d.lines.map(l => `${l.speaker}: ${l.text}`).join("\n");
+    const text = header + body;
+    navigator.clipboard.writeText(text).then(() => {
+      const prev = btn.textContent;
+      btn.textContent = "✓ Copied";
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    }).catch(() => {
+      // Fallback: select-into-textarea trick for older browsers
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand("copy"); } catch (_) {}
+      document.body.removeChild(ta);
+      const prev = btn.textContent;
+      btn.textContent = "✓ Copied";
+      setTimeout(() => { btn.textContent = prev; }, 1500);
+    });
   }
 
   function pickRoleplayRole(role) {
