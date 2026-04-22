@@ -16957,6 +16957,16 @@
       };
       const deepBtn = document.getElementById(practicePrefix + "-deep-btn");
       if (deepBtn) deepBtn.style.display = "inline-block";
+      // ── DEBUG: capture-side diagnostics ─────────────────────────────
+      console.log(`[rec] ${practicePrefix} stop — size:${blob.size}B mime:${mime} chunks:${practiceChunks.length}`);
+      audio.addEventListener("loadedmetadata", () => {
+        const d = audio.duration;
+        if (isFinite(d)) {
+          console.log(`[rec] ${practicePrefix} playback duration: ${d.toFixed(2)}s (~${Math.round(blob.size / Math.max(d,0.1))} B/s)`);
+        } else {
+          console.log(`[rec] ${practicePrefix} playback duration: unknown (${d})`);
+        }
+      }, { once: true });
       // Drop the recorder's internal chunk references so they can GC.
       practiceChunks = [];
       // Fully detach the recorder from this closure — lets Chrome release
@@ -17008,27 +17018,38 @@
           }
         };
         let lastErr = null;
-        r.onerror = (e) => { lastErr = e.error || "speech error"; };
+        r.onerror = (e) => {
+          lastErr = e.error || "speech error";
+          console.log(`[score] ${prefix} SR onerror:`, lastErr);
+        };
         r.onend = () => {
           const panel = document.getElementById(prefix + "-score-panel");
           if (!panel) return;
           const full = transcripts.join(" ").trim();
-          // SR sometimes returns empty even when you spoke (Google engine quirk).
-          // Don't overwrite the prior score band — just flash a small hint and
-          // leave whatever was there.
+          console.log(`[score] ${prefix} SR onend — transcripts:`, transcripts, "err:", lastErr);
+          // Empty transcript (Google STT returned nothing, with or without
+          // an explicit error). Render a neutral info block so the panel
+          // always reflects the latest attempt rather than a stale score.
           if (!full) {
-            const hint = lastErr === "no-speech"
-              ? "Didn't catch that — try again."
-              : "Speech not recognised — try again.";
-            showScoreHint(prefix, hint);
+            paintScoreInto(panel, {
+              pct: null, diff: [], prefix,
+              info: lastErr === "no-speech"
+                ? "Web Speech heard nothing this time — playback or Deep Score to verify."
+                : "Web Speech returned empty — playback or Deep Score to verify.",
+            });
             return;
           }
           // Discard non-Latin misrecognitions (Chrome fallback quirk).
           if (/[^\u0000-\u024F\u2010-\u2027\u2030-\u205F\s]/.test(full)) {
-            showScoreHint(prefix, "Recognised non-English text — try again.");
+            paintScoreInto(panel, {
+              pct: null, diff: [], prefix,
+              info: `Web Speech returned non-English (“${full}”) — playback or Deep Score to verify.`,
+            });
             return;
           }
-          paintScoreInto(panel, scoreLine(target, full));
+          const result = scoreLine(target, full);
+          result.prefix = prefix;
+          paintScoreInto(panel, result);
         };
         r.start();
         practiceRecognizer = r;
@@ -17581,15 +17602,39 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     hint._t = setTimeout(() => { if (hint) hint.textContent = ""; }, 4000);
   }
 
+  // Build a small diagnostic suffix like "  · 124KB · ~8.3s" for the
+  // current recording of a given practice prefix, if we have the data.
+  function _captureStatsText(prefix) {
+    if (!prefix) return "";
+    const rec = practiceLastBlob && practiceLastBlob[prefix];
+    const audio = document.getElementById(prefix + "-playback");
+    const parts = [];
+    if (rec && rec.blob && rec.blob.size) {
+      parts.push((rec.blob.size / 1024).toFixed(1) + "KB");
+    }
+    if (audio && isFinite(audio.duration) && audio.duration > 0) {
+      parts.push("~" + audio.duration.toFixed(1) + "s");
+    }
+    return parts.length ? "  ·  " + parts.join(" · ") : "";
+  }
+
   function paintScoreInto(hostEl, result) {
     if (!hostEl) return;
     hostEl.querySelectorAll(".rp-score.rp-speech-block").forEach(e => e.remove());
     const div = document.createElement("div");
+    const isInfo = result.pct === null || result.pct === undefined;
     div.className = "rp-score rp-speech-block " +
                     (result.error ? "rp-score-bad" :
+                     isInfo ? "rp-score-info" :
                      result.pct >= 85 ? "rp-score-good" :
                      result.pct >= 60 ? "rp-score-warn" : "rp-score-bad");
-    if (result.error) {
+    if (isInfo) {
+      div.style.cssText = "background:#2a2a2a; border-left:4px solid #888; color:#ccc; padding:10px 12px; margin-top:10px; border-radius:6px; font-size:13px;";
+      const stats = _captureStatsText(result.prefix);
+      div.innerHTML =
+        `<div>${escapeHtml(result.info || "")}</div>` +
+        (stats ? `<div style="color:var(--text-dim); font-size:11px; margin-top:4px">recording${stats}</div>` : "");
+    } else if (result.error) {
       div.innerHTML = `<span class="rp-score-pct">Error: ${escapeHtml(result.error)}</span>`;
     } else {
       const diffHtml = result.diff.map(d => {
@@ -17599,7 +17644,8 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
         if (d.status === "wrong") return `<span class="rp-word-wrong">${escapeHtml(d.word)}→${escapeHtml(d.heard)}</span>`;
         return "";
       }).join(" ");
-      div.innerHTML = `<div><span class="rp-score-pct">${result.pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">heard: ${escapeHtml(result.heard || "")}</span></div><div class="rp-score-diff">${diffHtml}</div>`;
+      const stats = _captureStatsText(result.prefix);
+      div.innerHTML = `<div><span class="rp-score-pct">${result.pct}%</span> <span style="color:var(--text-dim); font-size:11px; margin-left:8px">heard: ${escapeHtml(result.heard || "")}${stats}</span></div><div class="rp-score-diff">${diffHtml}</div>`;
     }
     hostEl.appendChild(div);
   }
