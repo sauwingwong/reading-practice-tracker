@@ -17008,29 +17008,24 @@
           }
         };
         let lastErr = null;
-        r.onerror = (e) => {
-          lastErr = e.error || "speech error";
-          console.log("[score] SR onerror:", lastErr);
-        };
+        r.onerror = (e) => { lastErr = e.error || "speech error"; };
         r.onend = () => {
           const panel = document.getElementById(prefix + "-score-panel");
           if (!panel) return;
           const full = transcripts.join(" ").trim();
-          console.log("[score] SR onend. transcripts:", transcripts, "err:", lastErr);
+          // SR sometimes returns empty even when you spoke (Google engine quirk).
+          // Don't overwrite the prior score band — just flash a small hint and
+          // leave whatever was there.
           if (!full) {
-            paintScoreInto(panel, {
-              pct: 0, diff: [],
-              error: lastErr === "no-speech"
-                ? "No speech detected — try speaking closer to the mic."
-                : (lastErr || "No transcript captured."),
-            });
+            const hint = lastErr === "no-speech"
+              ? "Didn't catch that — try again."
+              : "Speech not recognised — try again.";
+            showScoreHint(prefix, hint);
             return;
           }
-          // Discard misrecognitions that came back in a non-Latin script
-          // (Chrome sometimes falls back to other languages on low-confidence
-          // audio). Basic Latin + common punctuation only → treat as English.
+          // Discard non-Latin misrecognitions (Chrome fallback quirk).
           if (/[^\u0000-\u024F\u2010-\u2027\u2030-\u205F\s]/.test(full)) {
-            paintScoreInto(panel, { pct: 0, diff: [], error: "Recognised non-English text — try again." });
+            showScoreHint(prefix, "Recognised non-English text — try again.");
             return;
           }
           paintScoreInto(panel, scoreLine(target, full));
@@ -17568,6 +17563,24 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   }
 
   // Generic — renders a speech score into any container element.
+  // Non-intrusive hint that appears briefly under the record row when SR
+  // returns nothing usable — without wiping any existing score band.
+  function showScoreHint(prefix, message) {
+    const host = document.getElementById(prefix + "-record-btn")?.parentElement;
+    if (!host) return;
+    // Reuse or create a single hint element
+    let hint = host.querySelector(".score-hint");
+    if (!hint) {
+      hint = document.createElement("span");
+      hint.className = "score-hint";
+      hint.style.cssText = "margin-left:8px; font-size:12px; color:#e2b24c; font-style:italic;";
+      host.appendChild(hint);
+    }
+    hint.textContent = message;
+    clearTimeout(hint._t);
+    hint._t = setTimeout(() => { if (hint) hint.textContent = ""; }, 4000);
+  }
+
   function paintScoreInto(hostEl, result) {
     if (!hostEl) return;
     hostEl.querySelectorAll(".rp-score.rp-speech-block").forEach(e => e.remove());
