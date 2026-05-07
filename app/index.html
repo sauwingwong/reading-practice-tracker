@@ -938,6 +938,13 @@
           <button id="rp-role-b" class="rp-role-btn" onclick="pickRoleplayRole('B')"></button>
           <button id="rp-copy-btn" class="rp-role-btn" onclick="copyRoleplayTranscript(this)" title="Copy full dialogue to clipboard — paste into ChatGPT for feedback" style="margin-left:auto">📋 Copy transcript</button>
         </div>
+        <div class="rp-role-row">
+          <label style="font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim)">Length</label>
+          <button id="rp-len-short"  class="rp-role-btn" onclick="pickRoleplayLength('short')"  title="≈1–2 min (first 12 lines)">Short</button>
+          <button id="rp-len-medium" class="rp-role-btn" onclick="pickRoleplayLength('medium')" title="≈3–4 min (first 28 lines)">Medium</button>
+          <button id="rp-len-long"   class="rp-role-btn" onclick="pickRoleplayLength('long')"   title="≈5–10 min (full script)">Long</button>
+          <span id="rp-len-info" style="font-size:11px; color:var(--text-dim); margin-left:6px"></span>
+        </div>
         <div id="rp-dialogue" class="rp-dialogue"></div>
       </div>
     </div>
@@ -16417,6 +16424,37 @@
   const LINK_C = new Set(["v","m","n","k","d","l","s","z","p","b","f","ŋ","ʃ","ʒ","θ","ð","h","r","w","j","g"]);
   const VOWEL_STARTS = new Set("aeiouæɛɪɔʊə".split(""));
 
+  // Words spelled with a vowel letter but starting with a CONSONANT phoneme
+  // (/w/ or /j/). These should NOT receive linking-⌒/ʳ/ʷ/ʲ from a preceding word.
+  const CONSONANT_ONSET_EXCEPTIONS = new Set([
+    "one","once","oneself",
+    "use","used","useful","useless","user","using","usual","usually",
+    "unit","united","union","unique","universe","university","universal",
+    "europe","european","euro","ewe","uniform","utility","utilise","utilize",
+    "ubiquitous","ukulele","utopia","utopian","ufo",
+  ]);
+
+  // Words spelled with a consonant letter (usually silent h) but starting
+  // with a VOWEL phoneme. These SHOULD receive linking from a preceding word.
+  const VOWEL_ONSET_EXCEPTIONS = new Set([
+    "hour","hours","hourly","honest","honestly","honour","honoured","honourable",
+    "heir","heiress","heirloom",
+  ]);
+
+  function nextStartsWithVowelSound(nextWord) {
+    const lower = nextWord.lower;
+    if (CONSONANT_ONSET_EXCEPTIONS.has(lower)) return false;
+    if (VOWEL_ONSET_EXCEPTIONS.has(lower))     return true;
+    // Prefer the phoneme table when we have it.
+    const ipa = BRITFONE[lower];
+    if (typeof ipa === "string" && ipa.length) {
+      const first = ipa[0];
+      return VOWEL_STARTS.has(first) || "æɛɪɔʊəʌɑɜɒ".includes(first);
+    }
+    // Fallback: spelling heuristic (unchanged behaviour for unknown words).
+    return VOWEL_STARTS.has(lower[0]);
+  }
+
   function classifyPhoneme(phoneme) {
     if (!phoneme) return "none";
     if (phoneme === "t") return "glottal";
@@ -16455,7 +16493,7 @@
     for (let i = 0; i < words.length - 1; i++) {
       const curr = words[i], next = words[i + 1];
       const phoneme = BRITFONE[curr.lower] ?? letterFallback(curr.lower);
-      const nextVowel = VOWEL_STARTS.has(next.lower[0]);
+      const nextVowel = nextStartsWithVowelSound(next);
       const kind = classifyPhoneme(phoneme);
       if (kind === "glottal" && !nextVowel) {
         curr.glottalAfter = true;
@@ -17361,6 +17399,24 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
   let roleplayInit    = false;
   let currentTopicId  = null;
   let currentRole     = null;   // "A" or "B"
+  let currentLength   = "medium"; // "short" | "medium" | "long"
+  const RP_LENGTH_LINES = { short: 12, medium: 28, long: Infinity };
+
+  function rpVisibleLines(d) {
+    const cap = RP_LENGTH_LINES[currentLength] ?? Infinity;
+    return d.lines.slice(0, Math.min(cap, d.lines.length));
+  }
+
+  function pickRoleplayLength(len) {
+    if (!RP_LENGTH_LINES.hasOwnProperty(len)) return;
+    currentLength = len;
+    rpLineRec.clear();
+    ["short","medium","long"].forEach(k => {
+      const b = document.getElementById("rp-len-" + k);
+      if (b) b.classList.toggle("active", k === len);
+    });
+    if (currentTopicId) renderRoleplayDialogue();
+  }
   // Per-line state: key = lineIdx, value = { recorder, chunks, mime, audioBlob }
   const rpLineRec     = new Map();
 
@@ -17397,14 +17453,19 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     currentRole = "A";
     document.getElementById("rp-role-a").classList.add("active");
     document.getElementById("rp-role-b").classList.remove("active");
+    ["short","medium","long"].forEach(k => {
+      const b = document.getElementById("rp-len-" + k);
+      if (b) b.classList.toggle("active", k === currentLength);
+    });
     renderRoleplayDialogue();
   }
 
   function copyRoleplayTranscript(btn) {
     const d = ROLEPLAY_DIALOGUES.find(x => x.id === currentTopicId);
     if (!d) return;
-    const header = `${d.category} — ${d.title}\n${d.a} (A) ↔ ${d.b} (B)\n\n`;
-    const body = d.lines.map(l => `${l.speaker}: ${l.text}`).join("\n");
+    const visible = rpVisibleLines(d);
+    const header = `${d.category} — ${d.title} (${currentLength}, ${visible.length} lines)\n${d.a} (A) ↔ ${d.b} (B)\n\n`;
+    const body = visible.map(l => `${l.speaker}: ${l.text}`).join("\n");
     const text = header + body;
     navigator.clipboard.writeText(text).then(() => {
       const prev = btn.textContent;
@@ -17438,7 +17499,10 @@ Please evaluate my recording on these five areas only. For each: one-line verdic
     if (!d) return;
     const host = document.getElementById("rp-dialogue");
     host.innerHTML = "";
-    d.lines.forEach((line, idx) => {
+    const visible = rpVisibleLines(d);
+    const info = document.getElementById("rp-len-info");
+    if (info) info.textContent = `${visible.length} of ${d.lines.length} lines`;
+    visible.forEach((line, idx) => {
       const row = document.createElement("div");
       row.className = "rp-line";
       const name = line.speaker === "A" ? d.a : d.b;
